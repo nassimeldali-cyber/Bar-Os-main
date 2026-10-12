@@ -6,8 +6,8 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 export const isSupabaseConfigured = Boolean(
   supabaseUrl && 
   supabaseAnonKey && 
-  supabaseUrl !== 'https://your-project.supabase.co' &&
-  supabaseAnonKey !== 'your-anon-key'
+  supabaseUrl !== 'https://dlgyrqxlfcjwddruxcqu.supabase.co' &&
+  supabaseAnonKey !== 'sb_publishable_RuRk_aQK_GzESI008a_o_A_QD7EDHdQ'
 );
 
 export const supabase: SupabaseClient | null = isSupabaseConfigured
