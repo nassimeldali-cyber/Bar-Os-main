@@ -1,0 +1,6 @@
+{
+  "name": "BarLounge SaaS - Digital Order & Table Management",
+  "description": "SaaS complet de gestion digitale des commandes, sessions de table et transmission caisse physique pour bars, cafés et lounges.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
