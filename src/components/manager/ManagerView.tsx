@@ -25,7 +25,9 @@ import {
   Sparkles,
   ToggleLeft,
   ToggleRight,
-  FileText
+   FileText,
+  ChevronDown,
+  LogOut
 } from 'lucide-react';
 
 interface ManagerViewProps {
@@ -33,7 +35,7 @@ interface ManagerViewProps {
 }
 
 export const ManagerView: React.FC<ManagerViewProps> = ({ onOpenTableClient }) => {
-  const { currentRestaurant } = useAuth();
+  const { currentRestaurant, currentUser, switchUser } = useAuth();
   const { lastEventTimestamp } = useRealtime();
 
   const [activeTab, setActiveTab] = useState<
@@ -42,6 +44,14 @@ export const ManagerView: React.FC<ManagerViewProps> = ({ onOpenTableClient }) =
 
   const restaurantId = currentRestaurant?.id || 'a0000000-0000-0000-0000-000000000001';
   const currency = currentRestaurant?.currency || 'DT';
+
+  const staffProfiles = [
+    { id: 'b0000000-0000-0000-0000-000000000001', label: 'Gérant (Manager)', role: 'MANAGER', username: 'MANAGER_01' },
+    { id: 'b0000000-0000-0000-0000-000000000873', label: 'Karim (Serveur U873)', role: 'SERVER', username: 'U873' },
+    { id: 'b0000000-0000-0000-0000-000000000874', label: 'Sarra (Serveuse U874)', role: 'SERVER', username: 'U874' }
+  ];
+
+  const [showAccountMenu, setShowAccountMenu] = useState(false);
 
   // Data fetching
   const tables = useMemo(() => dbEngine.getTables(restaurantId), [restaurantId, lastEventTimestamp]);
@@ -539,20 +549,64 @@ export const ManagerView: React.FC<ManagerViewProps> = ({ onOpenTableClient }) =
         {/* ===================================================================
             TAB 3: SERVERS & ASSIGNMENTS
            =================================================================== */}
-        {activeTab === 'SERVERS' && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="font-black text-base text-slate-900">Équipe & Affectation des Tables</h2>
-                <p className="text-xs text-slate-500">Affectez plusieurs tables à chaque serveur (Section 7 & 13)</p>
-              </div>
-              <button
-                onClick={() => setIsAddingServer(true)}
-                className="py-2 px-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition"
-              >
-                + Nouveau Serveur
-              </button>
-            </div>
+         {activeTab === 'SERVERS' && (
+           <div className="space-y-4">
+             <div className="flex items-center justify-between">
+               <div>
+                 <h2 className="font-black text-base text-slate-900">Équipe & Affectation des Tables</h2>
+                 <p className="text-xs text-slate-500">Affectez plusieurs tables à chaque serveur (Section 7 & 13)</p>
+               </div>
+               <div className="flex items-center gap-2">
+                 <div className="relative">
+                   <button
+                     onClick={() => setShowAccountMenu(!showAccountMenu)}
+                     className="flex items-center gap-1.5 py-2 px-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition border border-slate-700"
+                   >
+                     <span>Changer de compte (Démo)</span>
+                     <ChevronDown className="w-3.5 h-3.5" />
+                   </button>
+
+                   {showAccountMenu && (
+                     <>
+                       <div className="fixed inset-0 z-40" onClick={() => setShowAccountMenu(false)} />
+                       <div className="absolute right-0 top-10 w-56 bg-white text-slate-900 rounded-2xl shadow-xl border border-slate-100 z-50 p-2 animate-in fade-in duration-150">
+                         <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-3 py-1.5">
+                           Comptes de démonstration
+                         </p>
+                         {staffProfiles.map((staff) => (
+                           <button
+                             key={staff.id}
+                             onClick={() => {
+                               switchUser(staff.id);
+                               setShowAccountMenu(false);
+                             }}
+                             className={`w-full text-left px-3 py-2 rounded-xl text-xs font-medium flex items-center justify-between transition ${
+                               currentUser?.id === staff.id
+                                 ? 'bg-amber-100 text-amber-900 font-semibold'
+                                 : 'hover:bg-slate-100 text-slate-700'
+                             }`}
+                           >
+                             <div>
+                               <div>{staff.label}</div>
+                               <div className="text-[10px] text-slate-400">{staff.username}</div>
+                             </div>
+                             {currentUser?.id === staff.id && (
+                               <span className="w-2 h-2 rounded-full bg-amber-500" />
+                             )}
+                           </button>
+                         ))}
+                       </div>
+                     </>
+                   )}
+                 </div>
+                 <button
+                   onClick={() => setIsAddingServer(true)}
+                   className="py-2 px-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition"
+                 >
+                   + Nouveau Serveur
+                 </button>
+               </div>
+             </div>
 
             {/* Add Server Form */}
             {isAddingServer && (

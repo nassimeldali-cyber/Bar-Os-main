@@ -23,6 +23,7 @@ import {
   ServiceRequestType
 } from '../types/database';
 import { ZOO_BAR_RESTAURANT, ZOO_BAR_CATEGORIES, ZOO_BAR_PRODUCTS } from '../data/zooBarMenu';
+import { supabase, isSupabaseConfigured } from './supabaseClient';
 
 const STORAGE_KEY = 'barlounge_saas_db_v4_zoobar_full';
 const SYNC_CHANNEL_NAME = 'barlounge_sync_channel';
@@ -225,15 +226,19 @@ export const INITIAL_DATA: DbState = {
 
 class DatabaseEngine {
   private state: DbState;
+  private realtimeChannels: any[] = [];
 
   constructor() {
     this.state = this.loadState();
+    this.setupSupabaseRealtime();
+    this.tryHydrateFromSupabase();
   }
 
   private loadState(): DbState {
     if (typeof window === 'undefined') {
       return JSON.parse(JSON.stringify(INITIAL_DATA));
     }
+    // localStorage is a fallback cache; primary source is Supabase (loaded async in constructor)
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
@@ -243,11 +248,11 @@ class DatabaseEngine {
       console.warn('Could not load stored database state, using initial seed', e);
     }
     const fresh = JSON.parse(JSON.stringify(INITIAL_DATA));
-    this.saveState(fresh);
     return fresh;
   }
 
   private saveState(state: DbState) {
+    // Always persist to localStorage as cache/fallback
     if (typeof window !== 'undefined') {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
@@ -255,6 +260,168 @@ class DatabaseEngine {
         console.error('Failed to write database to localStorage', e);
       }
     }
+    // Primary persistence is Supabase
+    this.syncToSupabase();
+  }
+
+  public async syncToSupabase(): Promise<void> {
+    if (!isSupabaseConfigured || !supabase) return;
+    const s = this.state;
+    try {
+      await supabase.from('restaurants').upsert(s.restaurants, { onConflict: 'id' });
+      await supabase.from('restaurant_users').upsert(s.restaurantUsers, { onConflict: 'id' });
+      await supabase.from('tables').upsert(s.tables, { onConflict: 'id' });
+      await supabase.from('table_sessions').upsert(s.tableSessions, { onConflict: 'id' });
+      await supabase.from('server_table_assignments').upsert(s.serverAssignments, { onConflict: 'id' });
+      await supabase.from('categories').upsert(s.categories, { onConflict: 'id' });
+      await supabase.from('products').upsert(s.products, { onConflict: 'id' });
+      await supabase.from('orders').upsert(s.orders, { onConflict: 'id' });
+      await supabase.from('order_items').upsert(s.orderItems, { onConflict: 'id' });
+      await supabase.from('payments').upsert(s.payments, { onConflict: 'id' });
+      await supabase.from('service_requests').upsert(s.serviceRequests, { onConflict: 'id' });
+      await supabase.from('notifications').upsert(s.notifications, { onConflict: 'id' });
+      await supabase.from('audit_logs').upsert(s.auditLogs, { onConflict: 'id' });
+    } catch (e) {
+      console.warn('Supabase sync failed, localStorage will remain source of truth', e);
+    }
+  }
+
+  private async tryHydrateFromSupabase(): Promise<void> {
+    if (!isSupabaseConfigured || !supabase || typeof window === 'undefined') return;
+    const restId = ZOO_BAR_RESTAURANT.id;
+    try {
+      const [
+        { data: restaurants, error: rErr },
+        { data: tables, error: tErr },
+        { data: sessions, error: sErr },
+        { data: orders, error: oErr },
+        { data: orderItems, error: oiErr },
+        { data: payments, error: pErr },
+        { data: serviceReqs, error: srErr },
+        { data: notifs, error: nErr },
+        { data: cats, error: cErr },
+        { data: prods, error: prErr },
+        { data: profiles, error: profErr },
+        { data: restUsers, error: ruErr },
+        { data: serverAssigns, error: saErr },
+      ] = await Promise.all([
+        supabase.from('restaurants').select('*').eq('id', restId),
+        supabase.from('tables').select('*').eq('restaurant_id', restId),
+        supabase.from('table_sessions').select('*').eq('restaurant_id', restId),
+        supabase.from('orders').select('*').eq('restaurant_id', restId),
+        supabase.from('order_items').select('*'),
+        supabase.from('payments').select('*').eq('restaurant_id', restId),
+        supabase.from('service_requests').select('*').eq('restaurant_id', restId),
+        supabase.from('notifications').select('*').eq('restaurant_id', restId),
+        supabase.from('categories').select('*').eq('restaurant_id', restId),
+        supabase.from('products').select('*').eq('restaurant_id', restId),
+        supabase.from('profiles').select('*'),
+        supabase.from('restaurant_users').select('*').eq('restaurant_id', restId),
+        supabase.from('server_table_assignments').select('*').eq('restaurant_id', restId),
+      ]);
+
+      const hasErrors = [rErr, tErr, sErr, oErr, oiErr, pErr, srErr, nErr, cErr, prErr, profErr, ruErr, saErr].some(e => e);
+      if (hasErrors) throw hasErrors;
+
+      const hasData = [restaurants?.length, tables?.length, sessions?.length, orders?.length, cats?.length, prods?.length].some(n => n && n > 0);
+      if (!hasData) {
+        console.log('[Supabase] No data found, seeding with initial data...');
+        await this.syncToSupabase();
+        return;
+      }
+
+      // Replace entire in-memory state with Supabase data (primary source)
+      this.state = {
+        restaurants: restaurants as Restaurant[],
+        profiles: profiles as Profile[],
+        restaurantUsers: restUsers as any[],
+        tables: tables as TableItem[],
+        tableSessions: sessions as TableSession[],
+        serverAssignments: serverAssigns as ServerTableAssignment[],
+        categories: cats as Category[],
+        products: prods as Product[],
+        orders: orders as Order[],
+        orderItems: orderItems as OrderItem[],
+        payments: payments as Payment[],
+        serviceRequests: serviceReqs as ServiceRequest[],
+        notifications: notifs as AppNotification[],
+        auditLogs: [],
+        counters: this.state.counters,
+      };
+
+      // Update localStorage cache to stay in sync
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
+        } catch {}
+      }
+
+      console.log('[Supabase] State hydrated from database — Supabase is primary source');
+      broadcastEvent('SESSION_UPDATED', { source: 'supabase_hydration' });
+      broadcastEvent('TABLE_STATUS_CHANGED', {});
+      broadcastEvent('MENU_UPDATED', {});
+    } catch (e) {
+      console.warn('[Supabase] Hydration failed, falling back to localStorage state', e);
+    }
+  }
+
+  private setupSupabaseRealtime(): void {
+    if (!isSupabaseConfigured || !supabase) return;
+
+    const tableMap: Record<string, RealtimeEventType> = {
+      table_sessions: 'SESSION_UPDATED',
+      orders: 'ORDER_UPDATED',
+      order_items: 'ORDER_UPDATED',
+      payments: 'PAYMENT_PROCESSED',
+      service_requests: 'SERVICE_REQUESTED',
+      notifications: 'NOTIFICATION_CREATED',
+      tables: 'TABLE_STATUS_CHANGED',
+    };
+
+    Object.entries(tableMap).forEach(([tbl, eventType]) => {
+      const channel = supabase!.channel(`public:${tbl}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: tbl }, async (payload) => {
+          await this.refreshStateFromSupabase();
+          broadcastEvent(eventType, payload.new || payload);
+        })
+        .subscribe();
+      this.realtimeChannels.push(channel);
+    });
+  }
+
+  private async refreshStateFromSupabase(): Promise<void> {
+    if (!isSupabaseConfigured || !supabase) return;
+    const restId = this.state.restaurants[0]?.id || ZOO_BAR_RESTAURANT.id;
+    try {
+      const { data: tablesData } = await supabase.from('tables').select('*').eq('restaurant_id', restId);
+      const { data: sessionsData } = await supabase.from('table_sessions').select('*').eq('restaurant_id', restId);
+      const { data: ordersData } = await supabase.from('orders').select('*').eq('restaurant_id', restId);
+      const { data: orderItemsData } = await supabase.from('order_items').select('*');
+      const { data: paymentsData } = await supabase.from('payments').select('*').eq('restaurant_id', restId);
+      const { data: serviceReqsData } = await supabase.from('service_requests').select('*').eq('restaurant_id', restId);
+      const { data: notifsData } = await supabase.from('notifications').select('*').eq('restaurant_id', restId);
+      const { data: catsData } = await supabase.from('categories').select('*').eq('restaurant_id', restId);
+      const { data: prodsData } = await supabase.from('products').select('*').eq('restaurant_id', restId);
+
+      if (tablesData) this.state.tables = tablesData as TableItem[];
+      if (sessionsData) this.state.tableSessions = sessionsData as TableSession[];
+      if (ordersData) this.state.orders = ordersData as Order[];
+      if (orderItemsData) this.state.orderItems = orderItemsData as OrderItem[];
+      if (paymentsData) this.state.payments = paymentsData as Payment[];
+      if (serviceReqsData) this.state.serviceRequests = serviceReqsData as ServiceRequest[];
+      if (notifsData) this.state.notifications = notifsData as AppNotification[];
+      if (catsData) this.state.categories = catsData as Category[];
+      if (prodsData) this.state.products = prodsData as Product[];
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
+    } catch (e) {
+      console.warn('[Supabase] Realtime refresh failed', e);
+    }
+  }
+
+  public destroy(): void {
+    this.realtimeChannels.forEach((ch) => supabase?.removeChannel(ch));
+    this.realtimeChannels = [];
   }
 
   public resetToSeed(): DbState {
@@ -262,12 +429,15 @@ class DatabaseEngine {
     this.saveState(this.state);
     broadcastEvent('MENU_UPDATED', {});
     broadcastEvent('TABLE_STATUS_CHANGED', {});
+    // Re-hydrate from Supabase (which now has fresh seed data)
+    setTimeout(() => this.tryHydrateFromSupabase(), 500);
     return this.state;
   }
 
   public getState(): DbState {
-    // Re-check localStorage in case another tab updated it
-    if (typeof window !== 'undefined') {
+    // When Supabase is the primary source, in-memory state is kept fresh by Realtime.
+    // Only fall back to localStorage when Supabase is not configured (offline/dev mode).
+    if (!isSupabaseConfigured && typeof window !== 'undefined') {
       try {
         const stored = localStorage.getItem(STORAGE_KEY);
         if (stored) {

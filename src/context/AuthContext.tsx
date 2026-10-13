@@ -72,6 +72,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setCurrentUser(profile);
       localStorage.setItem(AUTH_STORAGE_KEY, profile.id);
 
+      // Trigger Supabase sync for profile data
+      void dbEngine.syncToSupabase();
+
       // Default restaurant for demo
       const rest = dbEngine.getAllRestaurants()[0];
       if (rest) {
