@@ -23,6 +23,7 @@ import {
   ServiceRequestType
 } from '../types/database';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
+import { SEED_STATE } from './seedData';
 
 const STORAGE_KEY = 'barlounge_saas_db_v4_zoobar_full';
 const RESTAURANT_STORAGE_KEY = 'barlounge_auth_restaurant_id';
@@ -119,26 +120,7 @@ export interface DbState {
   };
 }
 
-export const EMPTY_STATE: DbState = {
-  restaurants: [],
-  profiles: [],
-  restaurantUsers: [],
-  tables: [],
-  tableSessions: [],
-  serverAssignments: [],
-  categories: [],
-  products: [],
-  orders: [],
-  orderItems: [],
-  payments: [],
-  serviceRequests: [],
-  notifications: [],
-  auditLogs: [],
-  counters: {
-    orderSeq: 1,
-    sessionSeq: 1
-  }
-};
+export const EMPTY_STATE: DbState = SEED_STATE;
 
 class DatabaseEngine {
   private state: DbState;
@@ -158,7 +140,10 @@ class DatabaseEngine {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
-        return JSON.parse(stored);
+        const parsed = JSON.parse(stored);
+        if (parsed.restaurants && parsed.restaurants.length > 0) {
+          return parsed;
+        }
       }
     } catch (e) {
       console.warn('Could not load stored database state, using initial seed', e);
