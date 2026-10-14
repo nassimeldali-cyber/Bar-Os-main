@@ -4,6 +4,7 @@
  */
 
 import { dbEngine } from './dbEngine';
+import { Profile } from '../types/database';
 
 export interface TestResult {
   id: number;
@@ -21,7 +22,6 @@ export async function runAllTests(): Promise<{
   results: TestResult[];
 }> {
   const results: TestResult[] = [];
-  const restId = 'a0000000-0000-0000-0000-000000000001';
 
   // Helper for timing
   const runTest = async (
@@ -48,11 +48,88 @@ export async function runAllTests(): Promise<{
     }
   };
 
-  // Setup fresh state for isolation
+  // Reset in-memory state and re-hydrate from Supabase
   dbEngine.resetToSeed();
+
+  // Get actual restaurant ID from dbEngine (sourced from DB or localStorage)
+  const restaurants = dbEngine.getAllRestaurants();
+  const restId = restaurants[0]?.id || '';
+
+  if (!restId) {
+    results.push({
+      id: 0,
+      title: 'Prérequis: Données de restaurant',
+      category: 'Setup',
+      passed: false,
+      durationMs: 0,
+      details: 'Aucun restaurant disponible. Veuillez appliquer les migrations Supabase (supabase db push) ou charger des données.'
+    });
+    return {
+      total: 1,
+      passed: 0,
+      failed: 1,
+      results
+    };
+  }
+
   const tables = dbEngine.getTables(restId);
-  const testTable = tables[0]; // Table 01
+  const testTable = tables[0];
+  if (!testTable) {
+    results.push({
+      id: 0,
+      title: 'Prérequis: Table de test',
+      category: 'Setup',
+      passed: false,
+      durationMs: 0,
+      details: `Aucune table trouvée pour le restaurant ${restId}`
+    });
+    return {
+      total: 1,
+      passed: 0,
+      failed: 1,
+      results
+    };
+  }
+
   const products = dbEngine.getAvailableProducts(restId);
+  if (products.length < 3) {
+    results.push({
+      id: 0,
+      title: 'Prérequis: Produits',
+      category: 'Setup',
+      passed: false,
+      durationMs: 0,
+      details: `Au moins 3 produits sont nécessaires pour les tests, seulement ${products.length} trouvés.`
+    });
+    return {
+      total: 1,
+      passed: 0,
+      failed: 1,
+      results
+    };
+  }
+
+  // Get a server profile for payment tests (must exist in DB)
+  const staffProfiles = dbEngine.getStaffProfiles(restId);
+  const serverProfile = staffProfiles.find((p: Profile) => p.role === 'SERVER');
+
+  if (!serverProfile) {
+    results.push({
+      id: 0,
+      title: 'Prérequis: Profil serveur',
+      category: 'Setup',
+      passed: false,
+      durationMs: 0,
+      details: 'Aucun profil serveur (SERVER) trouvé. Créez d\'abord un serveur dans la vue Gérant > Serveurs.'
+    });
+    return {
+      total: 1,
+      passed: 0,
+      failed: 1,
+      results
+    };
+  }
+
   let activeSessionId = '';
 
   // TEST 1: Création session
@@ -83,7 +160,7 @@ export async function runAllTests(): Promise<{
   // TEST 3: Création commande
   let firstOrderId = '';
   await runTest(3, '3. Création commande', 'Commande', () => {
-    const item1 = products[0]; // e.g., Mojito Passion
+    const item1 = products[0];
     const order = dbEngine.createOrder(
       restId,
       activeSessionId,
@@ -100,7 +177,7 @@ export async function runAllTests(): Promise<{
 
   // TEST 4: Plusieurs commandes dans une même session
   await runTest(4, '4. Commandes multiples dans une session', 'Commande', () => {
-    const item2 = products[1]; // Espresso Martini
+    const item2 = products[1];
     const order2 = dbEngine.createOrder(
       restId,
       activeSessionId,
@@ -142,13 +219,13 @@ export async function runAllTests(): Promise<{
     paymentResult = dbEngine.confirmPayment(
       activeSessionId,
       'TPE',
-      'b0000000-0000-0000-0000-000000000873',
-      'Karim Serveur',
+      serverProfile!.id,
+      serverProfile!.full_name,
       'Carte Visa'
     );
     if (!paymentResult || paymentResult.status !== 'CONFIRMED') throw new Error('Paiement non confirmé');
     if (paymentResult.method !== 'TPE') throw new Error('Mode de paiement incorrect');
-    return `Règlement TPE de ${paymentResult.amount.toFixed(3)} TND validé par Karim Serveur.`;
+    return `Règlement TPE de ${paymentResult.amount.toFixed(3)} TND validé par ${serverProfile!.full_name}.`;
   });
 
   // TEST 8: Fermeture session
@@ -168,40 +245,38 @@ export async function runAllTests(): Promise<{
 
   // TEST 10: Séparation multi-restaurant A/B
   await runTest(10, '10. Isolation Multi-Restaurant A/B', 'Sécurité', () => {
-    // Add dummy restaurant B
-    const restBId = 'a0000000-0000-0000-0000-000000000099';
     const restATables = dbEngine.getTables(restId);
-    if (restATables.length !== 10) {
-      throw new Error(`Le restaurant A doit posséder 10 tables, obtenu: ${restATables.length}`);
+    if (restATables.length !== tables.length) {
+      throw new Error(`Isolation échouée: le restaurant A a ${restATables.length} tables, attendu ${tables.length}`);
     }
-    const lastTable = restATables.find((table) => table.table_number === '10');
-    if (!lastTable) throw new Error('La table 10 doit appartenir au restaurant A');
+    const lastTable = restATables[restATables.length - 1];
+    if (!lastTable) throw new Error('Le restaurant A doit posséder au moins une table');
+    const restBId = 'non-existent-restaurant-id';
     const restBOrders = dbEngine.getAllOrders(restBId);
     if (restBOrders.length !== 0) throw new Error('Le Restaurant B ne doit voir aucune commande du Restaurant A');
     const restBTables = dbEngine.getTables(restBId);
     if (restBTables.length !== 0) throw new Error('Le Restaurant B ne doit voir aucune table du Restaurant A');
-    return `Isolation étanche validée entre Restaurant A (${restId}) et Restaurant B (${restBId}).`;
+    return `Isolation étanche validée entre Restaurant A (${restId}) et Restaurant B (inexistant).`;
   });
 
   // TEST 11: Permissions serveur
   await runTest(11, '11. Permissions Serveur', 'Sécurité', () => {
-    const serverProfile = dbEngine.getProfileByUsername('U873');
-    if (!serverProfile || serverProfile.role !== 'SERVER') throw new Error('Rôle attendu SERVER');
-    const assignedTables = dbEngine.getServerAssignedTableIds(serverProfile.id);
-    if (assignedTables.length === 0) throw new Error('Le serveur doit avoir des tables assignées');
-    return `Profil ${serverProfile.username} restreint au rôle SERVER avec ${assignedTables.length} tables assignées.`;
+    const serverProfileCheck = dbEngine.getProfileByUsername(serverProfile!.username);
+    if (!serverProfileCheck || serverProfileCheck.role !== 'SERVER') throw new Error('Rôle attendu SERVER');
+    const assignedTables = dbEngine.getServerAssignedTableIds(serverProfileCheck.id);
+    if (assignedTables.length === 0) throw new Error('Le serveur doit avoir des tables assignées ou le test échoue');
+    return `Profil ${serverProfileCheck.username} restreint au rôle SERVER avec ${assignedTables.length} tables assignées.`;
   });
 
   // TEST 12: Permissions Manager
   await runTest(12, '12. Permissions Manager', 'Sécurité', () => {
-    const managerProfile = dbEngine.getProfileById('b0000000-0000-0000-0000-000000000001');
+    const managerProfile = staffProfiles.find((p: Profile) => p.role === 'MANAGER');
     if (!managerProfile || managerProfile.role !== 'MANAGER') throw new Error('Rôle attendu MANAGER');
     return `Gérant ${managerProfile.username} dispose de l'accès administratif complet.`;
   });
 
   // TEST 13: Sécurité RLS et mutation non autorisée
   await runTest(13, '13. Sécurité RLS (Interdiction fermer session client)', 'Sécurité', () => {
-    // Attempting double closure or illegal mutation
     let blocked = false;
     try {
       dbEngine.confirmPayment(activeSessionId, 'CASH', 'client-fake', 'Client');
@@ -216,7 +291,7 @@ export async function runAllTests(): Promise<{
   await runTest(14, '14. Blocage du double paiement', 'Paiement', () => {
     let failed = false;
     try {
-      dbEngine.confirmPayment(activeSessionId, 'CASH', 'b0000000-0000-0000-0000-000000000873', 'Karim Serveur');
+      dbEngine.confirmPayment(activeSessionId, 'CASH', serverProfile!.id, serverProfile!.full_name);
     } catch (err: any) {
       failed = true;
     }
@@ -226,10 +301,9 @@ export async function runAllTests(): Promise<{
 
   // TEST 15: Produit indisponible
   await runTest(15, '15. Produit indisponible non commandable', 'Menu', () => {
-    // Open a fresh session on table 02
     const table2 = tables[1];
+    if (!table2) throw new Error('Il faut au moins 2 tables pour ce test');
     const newSession = dbEngine.getOrCreateActiveSession(restId, table2.id);
-    // Mark a product unavailable
     const prod = products[2];
     dbEngine.updateProduct(prod.id, { available: false });
 
@@ -240,7 +314,6 @@ export async function runAllTests(): Promise<{
       orderBlocked = true;
     }
 
-    // Revert product availability
     dbEngine.updateProduct(prod.id, { available: true });
 
     if (!orderBlocked) {

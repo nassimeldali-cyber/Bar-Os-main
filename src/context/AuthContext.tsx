@@ -1,20 +1,23 @@
 /**
  * AuthContext - BarLounge SaaS
  * Provides user state, role guards, and authentication methods
+ * Uses Supabase Auth for authentication and profile management.
  */
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Profile, Restaurant, UserRole } from '../types/database';
 import { dbEngine } from '../lib/dbEngine';
+import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 
 interface AuthContextType {
   currentUser: Profile | null;
   currentRestaurant: Restaurant | null;
   role: UserRole | null;
   isLoading: boolean;
-  login: (identifier: string, expectedRole?: UserRole) => Promise<boolean>;
-  logout: () => void;
+  login: (email: string, password: string) => Promise<boolean>;
+  logout: () => Promise<void>;
   switchUser: (profileId: string) => void;
+  signUp: (email: string, password: string, fullName: string) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -28,58 +31,161 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Initialize default restaurant
-    const defaultRest = dbEngine.getAllRestaurants()[0];
-    setCurrentRestaurant(defaultRest || null);
+    if (isSupabaseConfigured && supabase) {
+      // Listen for auth state changes
+      const {
+        data: { subscription },
+      } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (event === 'SIGNED_IN' && session) {
+          const client = supabase;
+          if (client) {
+            const { data: profile, error } = await client
+              .from('profiles')
+              .select('*')
+              .eq('id', session.user.id)
+              .single();
 
-    // Check stored user
-    const savedUserId = localStorage.getItem(AUTH_STORAGE_KEY);
-    if (savedUserId) {
-      const profile = dbEngine.getProfileById(savedUserId);
-      if (profile && profile.is_active) {
-        setCurrentUser(profile);
-      } else {
-        localStorage.removeItem(AUTH_STORAGE_KEY);
+            if (profile && !error) {
+              setCurrentUser(profile as Profile);
+              localStorage.setItem(AUTH_STORAGE_KEY, profile.id);
+
+              // Get restaurant from restaurant_users
+              const { data: restUsers } = await client
+                .from('restaurant_users')
+                .select('restaurant_id')
+                .eq('user_id', profile.id)
+                .limit(1);
+
+              const restId = restUsers?.[0]?.restaurant_id;
+              if (restId) {
+                localStorage.setItem(RESTAURANT_STORAGE_KEY, restId);
+                const restaurant = dbEngine.getAllRestaurants().find((r) => r.id === restId);
+                if (restaurant) {
+                  setCurrentRestaurant(restaurant);
+                }
+              }
+            }
+          }
+        } else if (event === 'SIGNED_OUT') {
+          setCurrentUser(null);
+          setCurrentRestaurant(null);
+          localStorage.removeItem(AUTH_STORAGE_KEY);
+        }
+      });
+
+      // Check for existing session on mount
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session) {
+          const client = supabase;
+          if (client) {
+            client
+              .from('profiles')
+              .select('*')
+              .eq('id', session.user.id)
+              .single()
+              .then(({ data: profile, error }) => {
+                if (profile && !error) {
+                  setCurrentUser(profile as Profile);
+                  localStorage.setItem(AUTH_STORAGE_KEY, profile.id);
+                }
+                const restaurant = dbEngine.getAllRestaurants()[0];
+                if (restaurant) {
+                  setCurrentRestaurant(restaurant);
+                }
+              });
+          }
+        }
+        setIsLoading(false);
+      });
+
+      return () => {
+        subscription.unsubscribe();
+      };
+    } else {
+      // Fallback: use localStorage cache without real auth
+      const defaultRest = dbEngine.getAllRestaurants()[0];
+      setCurrentRestaurant(defaultRest || null);
+
+      const savedUserId = localStorage.getItem(AUTH_STORAGE_KEY);
+      if (savedUserId) {
+        const profile = dbEngine.getProfileById(savedUserId);
+        if (profile && profile.is_active) {
+          setCurrentUser(profile);
+        } else {
+          localStorage.removeItem(AUTH_STORAGE_KEY);
+        }
       }
+      setIsLoading(false);
     }
-    setIsLoading(false);
   }, []);
 
-  const login = async (identifier: string, expectedRole?: UserRole): Promise<boolean> => {
+  const login = async (email: string, password: string): Promise<boolean> => {
+    if (!isSupabaseConfigured || !supabase) {
+      // Fallback: look up profile in local cache
+      const profile = dbEngine.getProfileByEmail(email) || dbEngine.getProfileByUsername(email);
+      if (profile && profile.is_active) {
+        setCurrentUser(profile);
+        localStorage.setItem(AUTH_STORAGE_KEY, profile.id);
+        const rest = dbEngine.getAllRestaurants()[0];
+        if (rest) {
+          setCurrentRestaurant(rest);
+          localStorage.setItem(RESTAURANT_STORAGE_KEY, rest.id);
+        }
+        void dbEngine.syncToSupabase();
+        return true;
+      }
+      return false;
+    }
+
     setIsLoading(true);
     try {
-      const clean = identifier.trim();
-      let profile = dbEngine.getProfileByUsername(clean);
-      if (!profile) {
-        profile = dbEngine.getProfileByEmail(clean);
-      }
+      const { data, error } = await supabase!.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-      if (!profile) {
+      if (error || !data.user) {
         setIsLoading(false);
         return false;
       }
 
-      if (expectedRole && profile.role !== expectedRole) {
+      const { data: profile, error: profErr } = await supabase!
+        .from('profiles')
+        .select('*')
+        .eq('id', data.user.id)
+        .single();
+
+      if (profErr || !profile) {
         setIsLoading(false);
         return false;
       }
 
-      if (!profile.is_active) {
-        setIsLoading(false);
-        return false;
-      }
-
-      setCurrentUser(profile);
+      setCurrentUser(profile as Profile);
       localStorage.setItem(AUTH_STORAGE_KEY, profile.id);
 
-      // Trigger Supabase sync for profile data
-      void dbEngine.syncToSupabase();
+      const { data: restUsers } = await supabase!
+        .from('restaurant_users')
+        .select('restaurant_id')
+        .eq('user_id', profile.id)
+        .limit(1);
 
-      // Default restaurant for demo
-      const rest = dbEngine.getAllRestaurants()[0];
-      if (rest) {
-        setCurrentRestaurant(rest);
-        localStorage.setItem(RESTAURANT_STORAGE_KEY, rest.id);
+      const restId = restUsers?.[0]?.restaurant_id;
+      if (restId) {
+        localStorage.setItem(RESTAURANT_STORAGE_KEY, restId);
+        const rest = dbEngine.getAllRestaurants().find((r) => r.id === restId);
+        if (rest) {
+          setCurrentRestaurant(rest);
+        } else {
+          const { data: restaurant } = await supabase!
+            .from('restaurants')
+            .select('*')
+            .eq('id', restId)
+            .single();
+          if (restaurant) {
+            setCurrentRestaurant(restaurant as Restaurant);
+            dbEngine.setRestaurant(restId);
+          }
+        }
       }
 
       setIsLoading(false);
@@ -91,8 +197,57 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const logout = () => {
+  const signUp = async (email: string, password: string, fullName: string): Promise<boolean> => {
+    if (!isSupabaseConfigured || !supabase) {
+      return false;
+    }
+
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+          },
+        },
+      });
+
+      if (error || !data.user) {
+        setIsLoading(false);
+        return false;
+      }
+
+      // Profile creation is handled by the database trigger
+      // Wait a moment for the trigger to execute, then fetch the profile
+      setTimeout(async () => {
+        const { data: profile } = await supabase!
+          .from('profiles')
+          .select('*')
+          .eq('id', data.user!.id)
+          .single();
+        if (profile) {
+          setCurrentUser(profile as Profile);
+          localStorage.setItem(AUTH_STORAGE_KEY, profile.id);
+        }
+      }, 1000);
+
+      setIsLoading(false);
+      return true;
+    } catch (e) {
+      console.error('Signup error', e);
+      setIsLoading(false);
+      return false;
+    }
+  };
+
+  const logout = async (): Promise<void> => {
+    if (isSupabaseConfigured && supabase) {
+      await supabase.auth.signOut();
+    }
     setCurrentUser(null);
+    setCurrentRestaurant(null);
     localStorage.removeItem(AUTH_STORAGE_KEY);
   };
 
@@ -101,6 +256,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (prof) {
       setCurrentUser(prof);
       localStorage.setItem(AUTH_STORAGE_KEY, prof.id);
+
+      const restUsers = dbEngine.getState().restaurantUsers.filter((ru) => ru.user_id === prof.id);
+      const restId = restUsers[0]?.restaurant_id;
+      if (restId) {
+        localStorage.setItem(RESTAURANT_STORAGE_KEY, restId);
+        const rest = dbEngine.getAllRestaurants().find((r) => r.id === restId);
+        if (rest) {
+          setCurrentRestaurant(rest);
+        }
+      }
     }
   };
 
@@ -113,7 +278,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading,
         login,
         logout,
-        switchUser
+        switchUser,
+        signUp,
       }}
     >
       {children}

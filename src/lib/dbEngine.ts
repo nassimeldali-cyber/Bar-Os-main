@@ -22,10 +22,10 @@ import {
   PaymentMethod,
   ServiceRequestType
 } from '../types/database';
-import { ZOO_BAR_RESTAURANT, ZOO_BAR_CATEGORIES, ZOO_BAR_PRODUCTS } from '../data/zooBarMenu';
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 
 const STORAGE_KEY = 'barlounge_saas_db_v4_zoobar_full';
+const RESTAURANT_STORAGE_KEY = 'barlounge_auth_restaurant_id';
 const SYNC_CHANNEL_NAME = 'barlounge_sync_channel';
 
 // Realtime event emitter
@@ -119,108 +119,24 @@ export interface DbState {
   };
 }
 
-export const INITIAL_DATA: DbState = {
-  restaurants: [ZOO_BAR_RESTAURANT],
-  profiles: [
-    {
-      id: 'b0000000-0000-0000-0000-000000000001',
-      email: 'manager@zoobar.tn',
-      full_name: 'Yassine Gérant',
-      username: 'MANAGER_01',
-      role: 'MANAGER',
-      is_active: true,
-      created_at: '2026-10-01T12:00:00Z',
-      updated_at: '2026-10-01T12:00:00Z'
-    },
-    {
-      id: 'b0000000-0000-0000-0000-000000000873',
-      email: 'u873@zoobar.tn',
-      full_name: 'Karim Serveur',
-      username: 'U873',
-      role: 'SERVER',
-      is_active: true,
-      created_at: '2026-10-01T12:00:00Z',
-      updated_at: '2026-10-01T12:00:00Z'
-    },
-    {
-      id: 'b0000000-0000-0000-0000-000000000874',
-      email: 'u874@zoobar.tn',
-      full_name: 'Sarra Serveuse',
-      username: 'U874',
-      role: 'SERVER',
-      is_active: true,
-      created_at: '2026-10-01T12:00:00Z',
-      updated_at: '2026-10-01T12:00:00Z'
-    }
-  ],
-  restaurantUsers: [
-    {
-      id: 'ru-1',
-      restaurant_id: 'a0000000-0000-0000-0000-000000000001',
-      user_id: 'b0000000-0000-0000-0000-000000000001',
-      role: 'MANAGER'
-    },
-    {
-      id: 'ru-2',
-      restaurant_id: 'a0000000-0000-0000-0000-000000000001',
-      user_id: 'b0000000-0000-0000-0000-000000000873',
-      role: 'SERVER'
-    },
-    {
-      id: 'ru-3',
-      restaurant_id: 'a0000000-0000-0000-0000-000000000001',
-      user_id: 'b0000000-0000-0000-0000-000000000874',
-      role: 'SERVER'
-    }
-  ],
-  tables: [
-    { id: 'd0000000-0000-0000-0000-000000000001', restaurant_id: 'a0000000-0000-0000-0000-000000000001', table_number: '01', zone: 'Terrasse', status: 'AVAILABLE', is_active: true, created_at: '2026-10-01T12:00:00Z', updated_at: '2026-10-01T12:00:00Z' },
-    { id: 'd0000000-0000-0000-0000-000000000002', restaurant_id: 'a0000000-0000-0000-0000-000000000001', table_number: '02', zone: 'Terrasse', status: 'AVAILABLE', is_active: true, created_at: '2026-10-01T12:00:00Z', updated_at: '2026-10-01T12:00:00Z' },
-    { id: 'd0000000-0000-0000-0000-000000000003', restaurant_id: 'a0000000-0000-0000-0000-000000000001', table_number: '03', zone: 'Terrasse', status: 'AVAILABLE', is_active: true, created_at: '2026-10-01T12:00:00Z', updated_at: '2026-10-01T12:00:00Z' },
-    { id: 'd0000000-0000-0000-0000-000000000004', restaurant_id: 'a0000000-0000-0000-0000-000000000001', table_number: '04', zone: 'Salle Lounge', status: 'AVAILABLE', is_active: true, created_at: '2026-10-01T12:00:00Z', updated_at: '2026-10-01T12:00:00Z' },
-    { id: 'd0000000-0000-0000-0000-000000000005', restaurant_id: 'a0000000-0000-0000-0000-000000000001', table_number: '05', zone: 'Salle Lounge', status: 'AVAILABLE', is_active: true, created_at: '2026-10-01T12:00:00Z', updated_at: '2026-10-01T12:00:00Z' },
-    { id: 'd0000000-0000-0000-0000-000000000006', restaurant_id: 'a0000000-0000-0000-0000-000000000001', table_number: '06', zone: 'Salle Lounge', status: 'AVAILABLE', is_active: true, created_at: '2026-10-01T12:00:00Z', updated_at: '2026-10-01T12:00:00Z' },
-    { id: 'd0000000-0000-0000-0000-000000000007', restaurant_id: 'a0000000-0000-0000-0000-000000000001', table_number: '07', zone: 'Salle Lounge', status: 'AVAILABLE', is_active: true, created_at: '2026-10-01T12:00:00Z', updated_at: '2026-10-01T12:00:00Z' },
-    { id: 'd0000000-0000-0000-0000-000000000008', restaurant_id: 'a0000000-0000-0000-0000-000000000001', table_number: '08', zone: 'Bar VIP', status: 'AVAILABLE', is_active: true, created_at: '2026-10-01T12:00:00Z', updated_at: '2026-10-01T12:00:00Z' },
-    { id: 'd0000000-0000-0000-0000-000000000009', restaurant_id: 'a0000000-0000-0000-0000-000000000001', table_number: '09', zone: 'Bar VIP', status: 'AVAILABLE', is_active: true, created_at: '2026-10-01T12:00:00Z', updated_at: '2026-10-01T12:00:00Z' },
-    { id: 'd0000000-0000-0000-0000-000000000010', restaurant_id: 'a0000000-0000-0000-0000-000000000001', table_number: '10', zone: 'Bar VIP', status: 'AVAILABLE', is_active: true, created_at: '2026-10-01T12:00:00Z', updated_at: '2026-10-01T12:00:00Z' }
-  ],
+export const EMPTY_STATE: DbState = {
+  restaurants: [],
+  profiles: [],
+  restaurantUsers: [],
+  tables: [],
   tableSessions: [],
-  serverAssignments: [
-    { id: 'sa-1', restaurant_id: 'a0000000-0000-0000-0000-000000000001', server_id: 'b0000000-0000-0000-0000-000000000873', table_id: 'd0000000-0000-0000-0000-000000000001', assigned_at: '2026-10-01T12:00:00Z' },
-    { id: 'sa-2', restaurant_id: 'a0000000-0000-0000-0000-000000000001', server_id: 'b0000000-0000-0000-0000-000000000873', table_id: 'd0000000-0000-0000-0000-000000000002', assigned_at: '2026-10-01T12:00:00Z' },
-    { id: 'sa-3', restaurant_id: 'a0000000-0000-0000-0000-000000000001', server_id: 'b0000000-0000-0000-0000-000000000873', table_id: 'd0000000-0000-0000-0000-000000000003', assigned_at: '2026-10-01T12:00:00Z' },
-    { id: 'sa-4', restaurant_id: 'a0000000-0000-0000-0000-000000000001', server_id: 'b0000000-0000-0000-0000-000000000873', table_id: 'd0000000-0000-0000-0000-000000000008', assigned_at: '2026-10-01T12:00:00Z' },
-    { id: 'sa-5', restaurant_id: 'a0000000-0000-0000-0000-000000000001', server_id: 'b0000000-0000-0000-0000-000000000874', table_id: 'd0000000-0000-0000-0000-000000000004', assigned_at: '2026-10-01T12:00:00Z' },
-    { id: 'sa-6', restaurant_id: 'a0000000-0000-0000-0000-000000000001', server_id: 'b0000000-0000-0000-0000-000000000874', table_id: 'd0000000-0000-0000-0000-000000000005', assigned_at: '2026-10-01T12:00:00Z' },
-    { id: 'sa-7', restaurant_id: 'a0000000-0000-0000-0000-000000000001', server_id: 'b0000000-0000-0000-0000-000000000874', table_id: 'd0000000-0000-0000-0000-000000000006', assigned_at: '2026-10-01T12:00:00Z' },
-    { id: 'sa-8', restaurant_id: 'a0000000-0000-0000-0000-000000000001', server_id: 'b0000000-0000-0000-0000-000000000874', table_id: 'd0000000-0000-0000-0000-000000000007', assigned_at: '2026-10-01T12:00:00Z' },
-    { id: 'sa-9', restaurant_id: 'a0000000-0000-0000-0000-000000000001', server_id: 'b0000000-0000-0000-0000-000000000874', table_id: 'd0000000-0000-0000-0000-000000000009', assigned_at: '2026-10-01T12:00:00Z' },
-    { id: 'sa-10', restaurant_id: 'a0000000-0000-0000-0000-000000000001', server_id: 'b0000000-0000-0000-0000-000000000874', table_id: 'd0000000-0000-0000-0000-000000000010', assigned_at: '2026-10-01T12:00:00Z' }
-  ],
-  categories: ZOO_BAR_CATEGORIES,
-  products: ZOO_BAR_PRODUCTS,
+  serverAssignments: [],
+  categories: [],
+  products: [],
   orders: [],
   orderItems: [],
   payments: [],
   serviceRequests: [],
   notifications: [],
-  auditLogs: [
-    {
-      id: 'log-seed',
-      restaurant_id: 'a0000000-0000-0000-0000-000000000001',
-      user_id: 'b0000000-0000-0000-0000-000000000001',
-      user_name: 'Yassine Gérant',
-      action: 'INITIAL_SEED',
-      entity_type: 'SYSTEM',
-      entity_id: 'SYSTEM',
-      details: { message: 'Database initialized with seed data' },
-      created_at: '2026-10-01T12:00:00Z'
-    }
-  ],
+  auditLogs: [],
   counters: {
     orderSeq: 1,
-    sessionSeq: 100
+    sessionSeq: 1
   }
 };
 
@@ -236,7 +152,7 @@ class DatabaseEngine {
 
   private loadState(): DbState {
     if (typeof window === 'undefined') {
-      return JSON.parse(JSON.stringify(INITIAL_DATA));
+      return JSON.parse(JSON.stringify(EMPTY_STATE));
     }
     // localStorage is a fallback cache; primary source is Supabase (loaded async in constructor)
     try {
@@ -247,7 +163,7 @@ class DatabaseEngine {
     } catch (e) {
       console.warn('Could not load stored database state, using initial seed', e);
     }
-    const fresh = JSON.parse(JSON.stringify(INITIAL_DATA));
+    const fresh = JSON.parse(JSON.stringify(EMPTY_STATE));
     return fresh;
   }
 
@@ -288,71 +204,103 @@ class DatabaseEngine {
 
   private async tryHydrateFromSupabase(): Promise<void> {
     if (!isSupabaseConfigured || !supabase || typeof window === 'undefined') return;
-    const restId = ZOO_BAR_RESTAURANT.id;
+
+    // Get restaurant ID from localStorage (set during auth) or from restaurant_users
+    let restId = this.state.restaurants[0]?.id;
+    if (!restId) {
+      const storedRestId = localStorage.getItem(RESTAURANT_STORAGE_KEY);
+      if (storedRestId) {
+        restId = storedRestId;
+      }
+    }
+
     try {
-      const [
-        { data: restaurants, error: rErr },
-        { data: tables, error: tErr },
-        { data: sessions, error: sErr },
-        { data: orders, error: oErr },
-        { data: orderItems, error: oiErr },
-        { data: payments, error: pErr },
-        { data: serviceReqs, error: srErr },
-        { data: notifs, error: nErr },
-        { data: cats, error: cErr },
-        { data: prods, error: prErr },
-        { data: profiles, error: profErr },
-        { data: restUsers, error: ruErr },
-        { data: serverAssigns, error: saErr },
-      ] = await Promise.all([
-        supabase.from('restaurants').select('*').eq('id', restId),
-        supabase.from('tables').select('*').eq('restaurant_id', restId),
-        supabase.from('table_sessions').select('*').eq('restaurant_id', restId),
-        supabase.from('orders').select('*').eq('restaurant_id', restId),
-        supabase.from('order_items').select('*'),
-        supabase.from('payments').select('*').eq('restaurant_id', restId),
-        supabase.from('service_requests').select('*').eq('restaurant_id', restId),
-        supabase.from('notifications').select('*').eq('restaurant_id', restId),
-        supabase.from('categories').select('*').eq('restaurant_id', restId),
-        supabase.from('products').select('*').eq('restaurant_id', restId),
-        supabase.from('profiles').select('*'),
-        supabase.from('restaurant_users').select('*').eq('restaurant_id', restId),
-        supabase.from('server_table_assignments').select('*').eq('restaurant_id', restId),
-      ]);
+      // Load public data (accessible to anon via RLS policies)
+      const { data: cats, error: cErr } = await supabase.from('categories').select('*');
+      const { data: prods, error: prErr } = await supabase.from('products').select('*');
 
-      const hasErrors = [rErr, tErr, sErr, oErr, oiErr, pErr, srErr, nErr, cErr, prErr, profErr, ruErr, saErr].some(e => e);
-      if (hasErrors) throw hasErrors;
-
-      const hasData = [restaurants?.length, tables?.length, sessions?.length, orders?.length, cats?.length, prods?.length].some(n => n && n > 0);
-      if (!hasData) {
-        console.log('[Supabase] No data found, seeding with initial data...');
-        await this.syncToSupabase();
-        return;
+      // Load restaurant (may require auth — fall back to restaurant_users for ID)
+      let restaurantsData: Restaurant[] = [];
+      if (restId) {
+        const { data: rests, error: rErr } = await supabase.from('restaurants').select('*').eq('id', restId);
+        if (!rErr && rests) {
+          restaurantsData = rests as Restaurant[];
+        } else {
+          console.warn('[Supabase] Cannot read restaurants table (missing GRANT). Using fallback.');
+        }
       }
 
-      // Replace entire in-memory state with Supabase data (primary source)
+      // Load protected data (requires auth session)
+      let tablesData: TableItem[] = [];
+      let sessionsData: TableSession[] = [];
+      let ordersData: Order[] = [];
+      let orderItemsData: OrderItem[] = [];
+      let paymentsData: Payment[] = [];
+      let serviceReqsData: ServiceRequest[] = [];
+      let notifsData: AppNotification[] = [];
+      let profilesData: Profile[] = [];
+      let restUsersData: any[] = [];
+      let serverAssignsData: ServerTableAssignment[] = [];
+
+      const getSettledData = <T,>(result: PromiseSettledResult<any>): T => {
+        if (result.status === 'fulfilled') {
+          return result.value?.data || [] as T;
+        }
+        return [] as T;
+      };
+
+      if (restId) {
+        const results = await Promise.allSettled([
+          supabase.from('tables').select('*').eq('restaurant_id', restId),
+          supabase.from('table_sessions').select('*').eq('restaurant_id', restId),
+          supabase.from('orders').select('*').eq('restaurant_id', restId),
+          supabase.from('order_items').select('*'),
+          supabase.from('payments').select('*').eq('restaurant_id', restId),
+          supabase.from('service_requests').select('*').eq('restaurant_id', restId),
+          supabase.from('notifications').select('*').eq('restaurant_id', restId),
+          supabase.from('profiles').select('*'),
+          supabase.from('restaurant_users').select('*').eq('restaurant_id', restId),
+          supabase.from('server_table_assignments').select('*').eq('restaurant_id', restId),
+        ]);
+
+        tablesData = getSettledData<TableItem[]>(results[0]);
+        sessionsData = getSettledData<TableSession[]>(results[1]);
+        ordersData = getSettledData<Order[]>(results[2]);
+        orderItemsData = getSettledData<OrderItem[]>(results[3]);
+        paymentsData = getSettledData<Payment[]>(results[4]);
+        serviceReqsData = getSettledData<ServiceRequest[]>(results[5]);
+        notifsData = getSettledData<AppNotification[]>(results[6]);
+        profilesData = getSettledData<Profile[]>(results[7]);
+        restUsersData = getSettledData<any[]>(results[8]);
+        serverAssignsData = getSettledData<ServerTableAssignment[]>(results[9]);
+      }
+
+      // Merge with existing state, replacing what we successfully loaded
       this.state = {
-        restaurants: restaurants as Restaurant[],
-        profiles: profiles as Profile[],
-        restaurantUsers: restUsers as any[],
-        tables: tables as TableItem[],
-        tableSessions: sessions as TableSession[],
-        serverAssignments: serverAssigns as ServerTableAssignment[],
+        restaurants: restaurantsData.length > 0 ? restaurantsData : this.state.restaurants,
+        profiles: profilesData.length > 0 ? (profilesData as Profile[]) : this.state.profiles,
+        restaurantUsers: restUsersData as any[],
+        tables: tablesData as TableItem[],
+        tableSessions: sessionsData as TableSession[],
+        serverAssignments: serverAssignsData as ServerTableAssignment[],
         categories: cats as Category[],
         products: prods as Product[],
-        orders: orders as Order[],
-        orderItems: orderItems as OrderItem[],
-        payments: payments as Payment[],
-        serviceRequests: serviceReqs as ServiceRequest[],
-        notifications: notifs as AppNotification[],
-        auditLogs: [],
+        orders: ordersData as Order[],
+        orderItems: orderItemsData as OrderItem[],
+        payments: paymentsData as Payment[],
+        serviceRequests: serviceReqsData as ServiceRequest[],
+        notifications: notifsData as AppNotification[],
+        auditLogs: this.state.auditLogs,
         counters: this.state.counters,
       };
 
-      // Update localStorage cache to stay in sync
+      // Update localStorage cache
       if (typeof window !== 'undefined') {
         try {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
+          if (restId) {
+            localStorage.setItem(RESTAURANT_STORAGE_KEY, restId);
+          }
         } catch {}
       }
 
@@ -361,7 +309,7 @@ class DatabaseEngine {
       broadcastEvent('TABLE_STATUS_CHANGED', {});
       broadcastEvent('MENU_UPDATED', {});
     } catch (e) {
-      console.warn('[Supabase] Hydration failed, falling back to localStorage state', e);
+      console.warn('[Supabase] Hydration failed, using localStorage state', e);
     }
   }
 
@@ -391,29 +339,65 @@ class DatabaseEngine {
 
   private async refreshStateFromSupabase(): Promise<void> {
     if (!isSupabaseConfigured || !supabase) return;
-    const restId = this.state.restaurants[0]?.id || ZOO_BAR_RESTAURANT.id;
+    let restId = this.state.restaurants[0]?.id;
+    if (!restId) {
+      restId = localStorage.getItem(RESTAURANT_STORAGE_KEY) || '';
+    }
+    if (!restId) return;
     try {
-      const { data: tablesData } = await supabase.from('tables').select('*').eq('restaurant_id', restId);
-      const { data: sessionsData } = await supabase.from('table_sessions').select('*').eq('restaurant_id', restId);
-      const { data: ordersData } = await supabase.from('orders').select('*').eq('restaurant_id', restId);
-      const { data: orderItemsData } = await supabase.from('order_items').select('*');
-      const { data: paymentsData } = await supabase.from('payments').select('*').eq('restaurant_id', restId);
-      const { data: serviceReqsData } = await supabase.from('service_requests').select('*').eq('restaurant_id', restId);
-      const { data: notifsData } = await supabase.from('notifications').select('*').eq('restaurant_id', restId);
-      const { data: catsData } = await supabase.from('categories').select('*').eq('restaurant_id', restId);
-      const { data: prodsData } = await supabase.from('products').select('*').eq('restaurant_id', restId);
+      const results = await Promise.allSettled([
+        supabase.from('tables').select('*').eq('restaurant_id', restId),
+        supabase.from('table_sessions').select('*').eq('restaurant_id', restId),
+        supabase.from('orders').select('*').eq('restaurant_id', restId),
+        supabase.from('order_items').select('*'),
+        supabase.from('payments').select('*').eq('restaurant_id', restId),
+        supabase.from('service_requests').select('*').eq('restaurant_id', restId),
+        supabase.from('notifications').select('*').eq('restaurant_id', restId),
+        supabase.from('categories').select('*'),
+        supabase.from('products').select('*'),
+        supabase.from('profiles').select('*'),
+        supabase.from('restaurant_users').select('*').eq('restaurant_id', restId),
+        supabase.from('server_table_assignments').select('*').eq('restaurant_id', restId),
+      ]);
 
-      if (tablesData) this.state.tables = tablesData as TableItem[];
-      if (sessionsData) this.state.tableSessions = sessionsData as TableSession[];
-      if (ordersData) this.state.orders = ordersData as Order[];
-      if (orderItemsData) this.state.orderItems = orderItemsData as OrderItem[];
-      if (paymentsData) this.state.payments = paymentsData as Payment[];
-      if (serviceReqsData) this.state.serviceRequests = serviceReqsData as ServiceRequest[];
-      if (notifsData) this.state.notifications = notifsData as AppNotification[];
-      if (catsData) this.state.categories = catsData as Category[];
-      if (prodsData) this.state.products = prodsData as Product[];
+      const getSettledData = <T,>(result: PromiseSettledResult<any>): T => {
+        if (result.status === 'fulfilled') {
+          return result.value?.data || [] as T;
+        }
+        return [] as T;
+      };
 
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
+      const tablesResult = getSettledData<TableItem[]>(results[0]);
+      const sessionsResult = getSettledData<TableSession[]>(results[1]);
+      const ordersResult = getSettledData<Order[]>(results[2]);
+      const orderItemsResult = getSettledData<OrderItem[]>(results[3]);
+      const paymentsResult = getSettledData<Payment[]>(results[4]);
+      const serviceReqsResult = getSettledData<ServiceRequest[]>(results[5]);
+      const notifsResult = getSettledData<AppNotification[]>(results[6]);
+      const catsResult = getSettledData<Category[]>(results[7]);
+      const prodsResult = getSettledData<Product[]>(results[8]);
+      const profilesResult = getSettledData<Profile[]>(results[9]);
+      const restUsersResult = getSettledData<any[]>(results[10]);
+      const serverAssignsResult = getSettledData<ServerTableAssignment[]>(results[11]);
+
+      if (tablesResult.length) this.state.tables = tablesResult;
+      if (sessionsResult.length) this.state.tableSessions = sessionsResult;
+      if (ordersResult.length) this.state.orders = ordersResult;
+      if (orderItemsResult.length) this.state.orderItems = orderItemsResult;
+      if (paymentsResult.length) this.state.payments = paymentsResult;
+      if (serviceReqsResult.length) this.state.serviceRequests = serviceReqsResult;
+      if (notifsResult.length) this.state.notifications = notifsResult;
+      if (catsResult.length) this.state.categories = catsResult;
+      if (prodsResult.length) this.state.products = prodsResult;
+      if (profilesResult.length) this.state.profiles = profilesResult;
+      if (restUsersResult.length) this.state.restaurantUsers = restUsersResult;
+      if (serverAssignsResult.length) this.state.serverAssignments = serverAssignsResult;
+
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
+        } catch {}
+      }
     } catch (e) {
       console.warn('[Supabase] Realtime refresh failed', e);
     }
@@ -425,11 +409,13 @@ class DatabaseEngine {
   }
 
   public resetToSeed(): DbState {
-    this.state = JSON.parse(JSON.stringify(INITIAL_DATA));
+    this.state = JSON.parse(JSON.stringify(EMPTY_STATE));
     this.saveState(this.state);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(RESTAURANT_STORAGE_KEY);
+    }
     broadcastEvent('MENU_UPDATED', {});
     broadcastEvent('TABLE_STATUS_CHANGED', {});
-    // Re-hydrate from Supabase (which now has fresh seed data)
     setTimeout(() => this.tryHydrateFromSupabase(), 500);
     return this.state;
   }
@@ -484,6 +470,23 @@ class DatabaseEngine {
 
   public getAllRestaurants(): Restaurant[] {
     return this.getState().restaurants;
+  }
+
+  public getRestaurantId(): string | null {
+    const state = this.getState();
+    if (state.restaurants[0]?.id) return state.restaurants[0].id;
+    if (state.restaurantUsers[0]?.restaurant_id) return state.restaurantUsers[0].restaurant_id;
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem(RESTAURANT_STORAGE_KEY);
+      if (stored) return stored;
+    }
+    return null;
+  }
+
+  public setRestaurant(restaurantId: string): void {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(RESTAURANT_STORAGE_KEY, restaurantId);
+    }
   }
 
   public getProfileByUsername(username: string): Profile | undefined {

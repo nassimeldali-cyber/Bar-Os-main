@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useRealtime } from '../../context/RealtimeContext';
+import { dbEngine } from '../../lib/dbEngine';
 import { NotificationDropdown } from './NotificationDropdown';
 import {
   Beer,
@@ -10,25 +11,25 @@ import {
   ShieldCheck,
   QrCode,
   LogOut,
+  LogIn,
   ChevronDown
 } from 'lucide-react';
 
 interface NavbarProps {
   currentView: 'CLIENT' | 'SERVER' | 'MANAGER';
   onNavigate: (view: 'CLIENT' | 'SERVER' | 'MANAGER', params?: { tableId?: string; restaurantId?: string }) => void;
+  onSwitchAuthMode?: (mode: 'LOGIN' | 'SIGNUP') => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
+export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onSwitchAuthMode }) => {
   const { currentUser, currentRestaurant, switchUser, logout } = useAuth();
   const { unreadCount, playChime } = useRealtime();
   const [showNotifs, setShowNotifs] = useState(false);
   const [showRoleMenu, setShowRoleMenu] = useState(false);
 
-  const staffProfiles = [
-    { id: 'b0000000-0000-0000-0000-000000000001', label: 'Gérant (Manager)', role: 'MANAGER', username: 'MANAGER_01' },
-    { id: 'b0000000-0000-0000-0000-000000000873', label: 'Karim (Serveur U873)', role: 'SERVER', username: 'U873' },
-    { id: 'b0000000-0000-0000-0000-000000000874', label: 'Sarra (Serveuse U874)', role: 'SERVER', username: 'U874' }
-  ];
+  const staffProfiles = currentRestaurant
+    ? dbEngine.getStaffProfiles(currentRestaurant.id)
+    : [];
 
   const handleSelectStaff = (profileId: string, role: string) => {
     switchUser(profileId);
@@ -58,7 +59,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
               </span>
             </div>
             <p className="text-xs text-slate-400 hidden sm:block">
-              {currentRestaurant?.name || 'Zoo Bar'}
+              {currentRestaurant?.name || 'BarLounge'}
             </p>
           </div>
         </div>
@@ -79,8 +80,13 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
 
           <button
             onClick={() => {
-              if (currentUser?.role !== 'SERVER') {
-                switchUser('b0000000-0000-0000-0000-000000000873');
+              if (currentView !== 'SERVER') {
+                const serverProfile = staffProfiles.find(p => p.role === 'SERVER');
+                if (serverProfile) {
+                  switchUser(serverProfile.id);
+                } else {
+                  onNavigate('SERVER');
+                }
               }
               onNavigate('SERVER');
             }}
@@ -96,8 +102,11 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
 
           <button
             onClick={() => {
-              if (currentUser?.role !== 'MANAGER') {
-                switchUser('b0000000-0000-0000-0000-000000000001');
+              if (currentView !== 'MANAGER') {
+                const managerProfile = staffProfiles.find(p => p.role === 'MANAGER');
+                if (managerProfile) {
+                  switchUser(managerProfile.id);
+                }
               }
               onNavigate('MANAGER');
             }}
@@ -164,28 +173,45 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setShowRoleMenu(false)} />
                 <div className="absolute right-0 top-12 w-60 bg-white text-slate-900 rounded-2xl shadow-xl border border-slate-100 z-50 p-2 animate-in fade-in duration-150">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-3 py-1.5">
-                    Changer de compte (Démo)
-                  </p>
-                  {staffProfiles.map((staff) => (
-                    <button
-                      key={staff.id}
-                      onClick={() => handleSelectStaff(staff.id, staff.role)}
-                      className={`w-full text-left px-3 py-2 rounded-xl text-xs font-medium flex items-center justify-between transition ${
-                        currentUser?.id === staff.id
-                          ? 'bg-amber-100 text-amber-900 font-semibold'
-                          : 'hover:bg-slate-100 text-slate-700'
-                      }`}
-                    >
-                      <div>
-                        <div>{staff.label}</div>
-                        <div className="text-[10px] text-slate-400">{staff.username}</div>
-                      </div>
-                      {currentUser?.id === staff.id && (
-                        <span className="w-2 h-2 rounded-full bg-amber-500" />
-                      )}
-                    </button>
-                  ))}
+                  {!currentUser ? (
+                    <>
+                      <button
+                        onClick={() => {
+                          onSwitchAuthMode?.('LOGIN');
+                          setShowRoleMenu(false);
+                        }}
+                        className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-slate-700 hover:bg-slate-100 flex items-center gap-2 transition"
+                      >
+                        <LogIn className="w-3.5 h-3.5" />
+                        Connexion / Inscription
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-3 py-1.5">
+                        Changer de compte
+                      </p>
+                      {staffProfiles.map((staff) => (
+                        <button
+                          key={staff.id}
+                          onClick={() => handleSelectStaff(staff.id, staff.role)}
+                          className={`w-full text-left px-3 py-2 rounded-xl text-xs font-medium flex items-center justify-between transition ${
+                            currentUser?.id === staff.id
+                              ? 'bg-amber-100 text-amber-900 font-semibold'
+                              : 'hover:bg-slate-100 text-slate-700'
+                          }`}
+                        >
+                          <div>
+                            <div>{staff.full_name} ({staff.role === 'MANAGER' ? 'Gérant' : 'Serveur'})</div>
+                            <div className="text-[10px] text-slate-400">{staff.username}</div>
+                          </div>
+                          {currentUser?.id === staff.id && (
+                            <span className="w-2 h-2 rounded-full bg-amber-500" />
+                          )}
+                        </button>
+                      ))}
+                    </>
+                  )}
                   <div className="border-t border-slate-100 my-1 pt-1">
                     <button
                       onClick={() => {
@@ -196,7 +222,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
                       className="w-full text-left px-3 py-2 rounded-xl text-xs font-medium text-red-600 hover:bg-red-50 flex items-center gap-2 transition"
                     >
                       <LogOut className="w-3.5 h-3.5" />
-                      Déconnexion (Vue Client)
+                      Déconnexion
                     </button>
                   </div>
                 </div>

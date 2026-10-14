@@ -45,7 +45,7 @@ export const ServerView: React.FC<ServerViewProps> = ({ onOpenTableClient }) => 
   // Selected table modal
   const [selectedTable, setSelectedTable] = useState<TableItem | null>(null);
 
-  const restaurantId = currentRestaurant?.id || 'a0000000-0000-0000-0000-000000000001';
+  const restaurantId = currentRestaurant?.id || dbEngine.getAllRestaurants()[0]?.id || '';
   const currency = currentRestaurant?.currency || 'DT';
 
   // Load server assigned table IDs

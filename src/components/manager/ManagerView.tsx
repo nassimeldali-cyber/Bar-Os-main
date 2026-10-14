@@ -42,14 +42,10 @@ export const ManagerView: React.FC<ManagerViewProps> = ({ onOpenTableClient }) =
     'KPIS' | 'TABLES' | 'SERVERS' | 'MENU' | 'SESSIONS' | 'PAYMENTS' | 'AUDIT' | 'TESTS'
   >('KPIS');
 
-  const restaurantId = currentRestaurant?.id || 'a0000000-0000-0000-0000-000000000001';
+  const restaurantId = currentRestaurant?.id || dbEngine.getAllRestaurants()[0]?.id || '';
   const currency = currentRestaurant?.currency || 'DT';
 
-  const staffProfiles = [
-    { id: 'b0000000-0000-0000-0000-000000000001', label: 'Gérant (Manager)', role: 'MANAGER', username: 'MANAGER_01' },
-    { id: 'b0000000-0000-0000-0000-000000000873', label: 'Karim (Serveur U873)', role: 'SERVER', username: 'U873' },
-    { id: 'b0000000-0000-0000-0000-000000000874', label: 'Sarra (Serveuse U874)', role: 'SERVER', username: 'U874' }
-  ];
+  const staffProfiles = dbEngine.getStaffProfiles(restaurantId);
 
   const [showAccountMenu, setShowAccountMenu] = useState(false);
 
@@ -224,9 +220,9 @@ export const ManagerView: React.FC<ManagerViewProps> = ({ onOpenTableClient }) =
           <div className="flex items-center gap-2">
             <button
               onClick={() => {
-                if (window.confirm('Réinitialiser la base de données aux données de démo (Zoo Bar) ?')) {
-                  dbEngine.resetToSeed();
-                }
+                   if (window.confirm('Effacer les données locales et recharger depuis la base de données ?')) {
+                   dbEngine.resetToSeed();
+                 }
               }}
               className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition border border-slate-700"
             >
@@ -573,28 +569,28 @@ export const ManagerView: React.FC<ManagerViewProps> = ({ onOpenTableClient }) =
                          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-3 py-1.5">
                            Comptes de démonstration
                          </p>
-                         {staffProfiles.map((staff) => (
-                           <button
-                             key={staff.id}
-                             onClick={() => {
-                               switchUser(staff.id);
-                               setShowAccountMenu(false);
-                             }}
-                             className={`w-full text-left px-3 py-2 rounded-xl text-xs font-medium flex items-center justify-between transition ${
-                               currentUser?.id === staff.id
-                                 ? 'bg-amber-100 text-amber-900 font-semibold'
-                                 : 'hover:bg-slate-100 text-slate-700'
-                             }`}
-                           >
-                             <div>
-                               <div>{staff.label}</div>
-                               <div className="text-[10px] text-slate-400">{staff.username}</div>
-                             </div>
-                             {currentUser?.id === staff.id && (
-                               <span className="w-2 h-2 rounded-full bg-amber-500" />
-                             )}
-                           </button>
-                         ))}
+                          {staffProfiles.map((staff) => (
+                            <button
+                              key={staff.id}
+                              onClick={() => {
+                                switchUser(staff.id);
+                                setShowAccountMenu(false);
+                              }}
+                              className={`w-full text-left px-3 py-2 rounded-xl text-xs font-medium flex items-center justify-between transition ${
+                                currentUser?.id === staff.id
+                                  ? 'bg-amber-100 text-amber-900 font-semibold'
+                                  : 'hover:bg-slate-100 text-slate-700'
+                              }`}
+                            >
+                              <div>
+                                <div>{staff.full_name} ({staff.role === 'MANAGER' ? 'Gérant' : 'Serveur'})</div>
+                                <div className="text-[10px] text-slate-400">{staff.username}</div>
+                              </div>
+                              {currentUser?.id === staff.id && (
+                                <span className="w-2 h-2 rounded-full bg-amber-500" />
+                              )}
+                            </button>
+                          ))}
                        </div>
                      </>
                    )}
