@@ -82,9 +82,16 @@ BEGIN
 
     (v_restaurant_id, v_cat_burgers, 'Lounge Smash Burger Double Cheddar', 'Double steak pur bœuf haché minute, oignons caramélisés, sauce secrète, frites fraîches', 28.000, true, 1),
     (v_restaurant_id, v_cat_burgers, 'Pizza Burrata Truffée', 'Sauce tomate San Marzano, mozzarella fior di latte, burrata crémeuse et filet d''huile de truffe', 32.000, true, 2),
+    (v_restaurant_id, v_cat_burgers, 'Mazzia 3 Fromages (Grande)', 'Pâte à pizza épaississime et aérée (style Mazzia), sauce tomate San Marzano, mozzarella di bufala, gorgonzola et parmesan, huile d''olive vierge', 26.000, true, 3),
 
     (v_restaurant_id, v_cat_desserts, 'Fondant Chocolat Noir & Glace Vanille', 'Cœur coulant chocolat noir 70%, boule de vanille de Madagascar', 13.000, true, 1),
     (v_restaurant_id, v_cat_desserts, 'Cheesecake Spéculoos New York', 'Base croquante spéculoos, crème onctueuse et coulis caramel beurre salé', 14.500, true, 2)
     ON CONFLICT DO NOTHING;
+
+    -- Product images require a public storage bucket. See migration 20261014000001_storage_buckets.sql
+    UPDATE products
+    SET image_url = 'https://dlgyrqxlfcjwddruxcqu.supabase.co/storage/v1/object/public/products/mazzia-3-fromages-grande.jpg'
+    WHERE restaurant_id = v_restaurant_id
+      AND name = 'Mazzia 3 Fromages (Grande)';
 
 END $$;

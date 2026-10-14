@@ -8,7 +8,8 @@ import {
   Category,
   Product,
   Order,
-  CartItem
+  CartItem,
+  ServiceRequestType
 } from '../../types/database';
 import {
   ShoppingBag,
@@ -78,6 +79,9 @@ export const ClientView: React.FC<ClientViewProps> = ({
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [modalItemNotes, setModalItemNotes] = useState('');
   const [modalItemQty, setModalItemQty] = useState(1);
+
+  // Track product image load errors so we can fall back to placeholder
+  const [erroredImages, setErroredImages] = useState<Set<string>>(() => new Set());
 
   // WiFi Modal & copy
   const [showWifiModal, setShowWifiModal] = useState(false);
@@ -218,9 +222,9 @@ export const ClientView: React.FC<ClientViewProps> = ({
   };
 
   // Service Request
-  const handleCallService = (type: 'CALL_SERVER' | 'WATER_REQUEST' | 'ICE_REQUEST' | 'ASHTRAY_REQUEST') => {
+  const handleCallService = (type: ServiceRequestType) => {
     if (!table || !restaurant) return;
-    dbEngine.createServiceRequest(table.id, restaurant.id, type === 'WATER_REQUEST' ? 'WATER_REQUEST' : 'CALL_SERVER', session?.id);
+    dbEngine.createServiceRequest(table.id, restaurant.id, type, session?.id);
     
     let msg = 'Serveur prévenu, il arrive à votre table !';
     if (type === 'WATER_REQUEST') msg = "Demande d'eau enregistrée !";
@@ -633,14 +637,19 @@ export const ClientView: React.FC<ClientViewProps> = ({
                   onClick={() => prod.available && setSelectedProduct(prod)}
                   className="w-24 h-24 rounded-xl bg-slate-950 overflow-hidden shrink-0 relative cursor-pointer group"
                 >
-                  {prod.image_url ? (
-                    <img
-                      src={prod.image_url}
-                      alt={prod.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                      loading="lazy"
-                    />
-                  ) : (
+                 {prod.image_url && !erroredImages.has(prod.id) ? (
+                     <img
+                       src={prod.image_url}
+                       alt={prod.name}
+                       className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                       loading="lazy"
+                       onError={() => setErroredImages((prev) => {
+                         const next = new Set(prev);
+                         next.add(prod.id);
+                         return next;
+                       })}
+                       />
+                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-slate-600">
                       <UtensilsCrossed className="w-6 h-6" />
                     </div>
@@ -764,13 +773,18 @@ export const ClientView: React.FC<ClientViewProps> = ({
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
           <div className="bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-3xl max-w-md w-full overflow-hidden shadow-2xl animate-in slide-in-from-bottom-4">
             <div className="relative h-48 bg-slate-950">
-              {selectedProduct.image_url ? (
-                <img
-                  src={selectedProduct.image_url}
-                  alt={selectedProduct.name}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
+               {selectedProduct.image_url && !erroredImages.has(selectedProduct.id) ? (
+                 <img
+                   src={selectedProduct.image_url}
+                   alt={selectedProduct.name}
+                   className="w-full h-full object-cover"
+                   onError={() => setErroredImages((prev) => {
+                     const next = new Set(prev);
+                     next.add(selectedProduct.id);
+                     return next;
+                   })}
+                 />
+               ) : (
                 <div className="w-full h-full flex items-center justify-center text-slate-600">
                   <UtensilsCrossed className="w-10 h-10" />
                 </div>
