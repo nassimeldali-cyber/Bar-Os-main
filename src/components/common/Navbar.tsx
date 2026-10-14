@@ -65,16 +65,16 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onSwitc
         </div>
 
         {/* View Switchers */}
-        <div className="flex items-center gap-1 sm:gap-2 bg-slate-950/60 p-1 rounded-xl border border-slate-800">
+          <div className="flex items-center gap-1 sm:gap-2 bg-slate-950/60 p-1 rounded-xl border border-slate-800">
           <button
             onClick={() => onNavigate('CLIENT')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition ${
               currentView === 'CLIENT'
                 ? 'bg-amber-500 text-slate-950 shadow-xs'
                 : 'text-slate-400 hover:text-white hover:bg-slate-800'
             }`}
           >
-            <QrCode className="w-3.5 h-3.5" />
+            <QrCode className="w-4 h-4" />
             <span className="hidden sm:inline">Client</span> QR
           </button>
 
@@ -90,13 +90,13 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onSwitc
               }
               onNavigate('SERVER');
             }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition ${
               currentView === 'SERVER'
                 ? 'bg-amber-500 text-slate-950 shadow-xs'
                 : 'text-slate-400 hover:text-white hover:bg-slate-800'
             }`}
           >
-            <Users className="w-3.5 h-3.5" />
+            <Users className="w-4 h-4" />
             <span className="hidden sm:inline">Espace</span> Serveur
           </button>
 
@@ -110,13 +110,13 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onSwitc
               }
               onNavigate('MANAGER');
             }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition ${
               currentView === 'MANAGER'
                 ? 'bg-amber-500 text-slate-950 shadow-xs'
                 : 'text-slate-400 hover:text-white hover:bg-slate-800'
             }`}
           >
-            <ShieldCheck className="w-3.5 h-3.5" />
+            <ShieldCheck className="w-4 h-4" />
             Gérant
           </button>
         </div>
@@ -127,6 +127,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onSwitc
           <button
             onClick={playChime}
             title="Tester le carillon sonore des notifications"
+            aria-label="Tester le carillon"
             className="p-2 rounded-lg text-slate-400 hover:text-amber-300 hover:bg-slate-800 transition"
           >
             <Volume2 className="w-4 h-4" />
@@ -136,6 +137,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onSwitc
           <div className="relative">
             <button
               onClick={() => setShowNotifs(!showNotifs)}
+              aria-label="Notifications"
               className="p-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 relative transition"
             >
               <Bell className="w-4 h-4" />
@@ -153,6 +155,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate, onSwitc
           <div className="relative">
             <button
               onClick={() => setShowRoleMenu(!showRoleMenu)}
+              aria-label="Menu utilisateur"
               className="flex items-center gap-2 pl-2 pr-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700/80 border border-slate-700 transition"
             >
               <div className="w-6 h-6 rounded-lg bg-amber-400/20 text-amber-300 flex items-center justify-center font-bold text-xs">

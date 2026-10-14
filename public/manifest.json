@@ -1,0 +1,26 @@
+{
+  "name": "BarLounge - Digital Order & Table Management",
+  "short_name": "BarLounge",
+  "description": "Digital order & table management for bars, cafés, and lounges.",
+  "start_url": "/",
+  "display": "standalone",
+  "display_override": ["window-controls", "minimal-ui"],
+  "background_color": "#0f172a",
+  "theme_color": "#f59e0b",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

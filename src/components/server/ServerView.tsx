@@ -650,7 +650,8 @@ export const ServerView: React.FC<ServerViewProps> = ({ onOpenTableClient }) => 
               </div>
               <button
                 onClick={() => setPayingSession(null)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white"
+                aria-label="Fermer"
+                className="p-2 rounded-lg text-slate-400 hover:text-white"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -756,7 +757,8 @@ export const ServerView: React.FC<ServerViewProps> = ({ onOpenTableClient }) => 
               </div>
               <button
                 onClick={() => setSelectedTable(null)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white"
+                aria-label="Fermer"
+                className="p-2 rounded-lg text-slate-400 hover:text-white"
               >
                 <X className="w-5 h-5" />
               </button>

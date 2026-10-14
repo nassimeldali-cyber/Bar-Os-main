@@ -330,6 +330,7 @@ export const ClientView: React.FC<ClientViewProps> = ({
               <button
                 onClick={() => setShowWifiModal(true)}
                 title="WiFi Client"
+                aria-label="Informations WiFi"
                 className="w-8 h-8 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-amber-300 flex items-center justify-center border border-slate-700 transition"
               >
                 <Wifi className="w-4 h-4" />
@@ -339,6 +340,8 @@ export const ClientView: React.FC<ClientViewProps> = ({
                 <div className="relative">
                   <button
                     onClick={() => setShowTablePicker(!showTablePicker)}
+                    aria-label="Changer de table"
+                    aria-expanded={showTablePicker}
                     className="text-xs bg-slate-800/90 hover:bg-slate-700 text-amber-400 font-bold px-2.5 py-1.5 rounded-xl border border-slate-700 flex items-center gap-1 transition"
                   >
                     <span>Table {table.table_number}</span>
@@ -469,32 +472,35 @@ export const ClientView: React.FC<ClientViewProps> = ({
       <div className="max-w-md mx-auto px-4 mt-3">
         <div className="grid grid-cols-4 gap-2">
           {/* Service button */}
-          <button
+           <button
             onClick={() => setShowServiceMenu(!showServiceMenu)}
-            className="flex flex-col items-center justify-center py-2.5 px-2 bg-slate-900 hover:bg-slate-800 rounded-2xl border border-slate-800 text-slate-200 text-[11px] font-bold shadow-sm transition active:scale-95"
+            aria-expanded={showServiceMenu}
+            className="flex flex-col items-center justify-center py-3 px-2 bg-slate-900 hover:bg-slate-800 rounded-2xl border border-slate-800 text-slate-200 text-[11px] font-bold shadow-sm transition active:scale-95 touch-target"
           >
-            <Bell className="w-4 h-4 text-amber-400 mb-1" />
+            <Bell className="w-5 h-5 text-amber-400 mb-1" />
             <span>Serveur</span>
           </button>
 
           {/* Quick Water request */}
           <button
             onClick={() => handleCallService('WATER_REQUEST')}
-            className="flex flex-col items-center justify-center py-2.5 px-2 bg-slate-900 hover:bg-slate-800 rounded-2xl border border-slate-800 text-slate-200 text-[11px] font-bold shadow-sm transition active:scale-95"
+            aria-label="Demander de l'eau"
+            className="flex flex-col items-center justify-center py-3 px-2 bg-slate-900 hover:bg-slate-800 rounded-2xl border border-slate-800 text-slate-200 text-[11px] font-bold shadow-sm transition active:scale-95 touch-target"
           >
-            <GlassWater className="w-4 h-4 text-sky-400 mb-1" />
+            <GlassWater className="w-5 h-5 text-sky-400 mb-1" />
             <span>Verre / Eau</span>
           </button>
 
           {/* Orders History */}
           <button
             onClick={() => setIsOrdersOpen(true)}
-            className="flex flex-col items-center justify-center py-2.5 px-2 bg-slate-900 hover:bg-slate-800 rounded-2xl border border-slate-800 text-slate-200 text-[11px] font-bold shadow-sm transition active:scale-95 relative"
+            aria-label="Historique des commandes"
+            className="flex flex-col items-center justify-center py-3 px-2 bg-slate-900 hover:bg-slate-800 rounded-2xl border border-slate-800 text-slate-200 text-[11px] font-bold shadow-sm transition active:scale-95 relative touch-target"
           >
-            <Clock className="w-4 h-4 text-indigo-400 mb-1" />
+            <Clock className="w-5 h-5 text-indigo-400 mb-1" />
             <span>Historique</span>
             {sessionOrders.length > 0 && (
-              <span className="absolute top-1.5 right-2 bg-indigo-500 text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center font-black">
+              <span className="absolute top-1.5 right-2 bg-indigo-500 text-white text-[9px] w-5 h-5 rounded-full flex items-center justify-center font-black">
                 {sessionOrders.length}
               </span>
             )}
@@ -504,13 +510,14 @@ export const ClientView: React.FC<ClientViewProps> = ({
           <button
             onClick={() => setShowBillModal(true)}
             disabled={session?.status === 'ADDITION_REQUESTED'}
-            className={`flex flex-col items-center justify-center py-2.5 px-2 rounded-2xl border text-[11px] font-bold shadow-sm transition active:scale-95 ${
+            aria-label="Demander l'addition"
+            className={`flex flex-col items-center justify-center py-3 px-2 rounded-2xl border text-[11px] font-bold shadow-sm transition active:scale-95 touch-target ${
               session?.status === 'ADDITION_REQUESTED'
                 ? 'bg-amber-950/60 border-amber-500/40 text-amber-400'
                 : 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-200'
             }`}
           >
-            <Receipt className="w-4 h-4 text-amber-400 mb-1" />
+            <Receipt className="w-5 h-5 text-amber-400 mb-1" />
             <span>Addition</span>
           </button>
         </div>
@@ -523,21 +530,21 @@ export const ClientView: React.FC<ClientViewProps> = ({
             </p>
             <button
               onClick={() => handleCallService('CALL_SERVER')}
-              className="w-full flex items-center gap-2 p-2 rounded-xl text-xs font-semibold hover:bg-slate-800 text-left transition"
+              className="w-full flex items-center gap-2 p-3 rounded-xl text-xs font-semibold hover:bg-slate-800 text-left transition"
             >
               <Bell className="w-4 h-4 text-amber-400" />
               <span>Appeler le serveur à table</span>
             </button>
             <button
               onClick={() => handleCallService('ICE_REQUEST')}
-              className="w-full flex items-center gap-2 p-2 rounded-xl text-xs font-semibold hover:bg-slate-800 text-left transition"
+              className="w-full flex items-center gap-2 p-3 rounded-xl text-xs font-semibold hover:bg-slate-800 text-left transition"
             >
               <Droplets className="w-4 h-4 text-sky-400" />
               <span>Glaçons supplémentaires</span>
             </button>
             <button
               onClick={() => handleCallService('ASHTRAY_REQUEST')}
-              className="w-full flex items-center gap-2 p-2 rounded-xl text-xs font-semibold hover:bg-slate-800 text-left transition"
+              className="w-full flex items-center gap-2 p-3 rounded-xl text-xs font-semibold hover:bg-slate-800 text-left transition"
             >
               <Cigarette className="w-4 h-4 text-rose-400" />
               <span>Demander un cendrier</span>
@@ -562,7 +569,8 @@ export const ClientView: React.FC<ClientViewProps> = ({
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-2.5 text-slate-400 hover:text-white"
+              aria-label="Effacer la recherche"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-2 rounded-lg"
             >
               <X className="w-4 h-4" />
             </button>
@@ -687,23 +695,21 @@ export const ClientView: React.FC<ClientViewProps> = ({
 
                     {prod.available ? (
                       inCartItem ? (
-                        <div className="flex items-center gap-1.5 bg-slate-800 text-white rounded-xl px-2 py-1 border border-slate-700">
-                          <button
-                            onClick={() => updateCartQty(prod.id, -1)}
-                            className="p-1 hover:text-amber-400 transition"
-                          >
-                            <Minus className="w-3.5 h-3.5" />
-                          </button>
-                          <span className="text-xs font-black w-4 text-center">
-                            {inCartItem.quantity}
-                          </span>
-                          <button
-                            onClick={() => updateCartQty(prod.id, 1)}
-                            className="p-1 hover:text-amber-400 transition"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+                       <div className="flex items-center gap-1.5 bg-slate-800 text-white rounded-xl px-1.5 py-1 border border-slate-700 min-w-[92px]">
+                         <button
+                           onClick={() => updateCartQty(prod.id, -1)}
+                           className="p-2 rounded-lg hover:text-amber-400 transition min-w-[32px] min-h-[32px] flex items-center justify-center"
+                         >
+                           <Minus className="w-4 h-4" />
+                         </button>
+                         <span className="text-xs font-black w-5 text-center">{inCartItem.quantity}</span>
+                         <button
+                           onClick={() => updateCartQty(prod.id, 1)}
+                           className="p-2 rounded-lg hover:text-amber-400 transition min-w-[32px] min-h-[32px] flex items-center justify-center"
+                         >
+                           <Plus className="w-4 h-4" />
+                         </button>
+                       </div>
                       ) : (
                         <button
                           onClick={() => addToCart(prod, 1)}
@@ -729,7 +735,7 @@ export const ClientView: React.FC<ClientViewProps> = ({
       {/* =====================================================================
           FLOATING BOTTOM DOCK: CART & BILL SUMMARY
          ===================================================================== */}
-      <div className="fixed bottom-0 inset-x-0 z-30 p-3 bg-gradient-to-t from-slate-950 via-slate-950/95 to-transparent">
+      <div className="fixed bottom-0 inset-x-0 z-30 p-3 bg-gradient-to-t from-slate-950 via-slate-950/95 to-transparent safe-bottom">
         <div className="max-w-md mx-auto flex items-center gap-2">
           {/* Bill Button */}
           <button
@@ -796,6 +802,7 @@ export const ClientView: React.FC<ClientViewProps> = ({
                   setModalItemQty(1);
                 }}
                 className="absolute top-3 right-3 w-8 h-8 rounded-full bg-slate-950/80 text-white flex items-center justify-center hover:bg-slate-950"
+                aria-label="Fermer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -830,17 +837,17 @@ export const ClientView: React.FC<ClientViewProps> = ({
 
               {/* Quantity and Add Button */}
               <div className="flex items-center gap-3 mt-5">
-                <div className="flex items-center gap-2 bg-slate-950 p-1.5 rounded-xl border border-slate-800">
+                <div className="flex items-center gap-2 bg-slate-950 p-1.5 rounded-xl border border-slate-800 min-w-[100px]">
                   <button
                     onClick={() => setModalItemQty((q) => Math.max(1, q - 1))}
-                    className="p-1 text-slate-400 hover:text-white"
+                    className="p-2 rounded-lg text-slate-400 hover:text-white min-w-[36px] min-h-[36px] flex items-center justify-center"
                   >
                     <Minus className="w-4 h-4" />
                   </button>
-                  <span className="text-xs font-black w-6 text-center">{modalItemQty}</span>
+                  <span className="text-xs font-black w-5 text-center">{modalItemQty}</span>
                   <button
                     onClick={() => setModalItemQty((q) => q + 1)}
-                    className="p-1 text-slate-400 hover:text-white"
+                    className="p-2 rounded-lg text-slate-400 hover:text-white min-w-[36px] min-h-[36px] flex items-center justify-center"
                   >
                     <Plus className="w-4 h-4" />
                   </button>
@@ -878,7 +885,8 @@ export const ClientView: React.FC<ClientViewProps> = ({
               </div>
               <button
                 onClick={() => setIsCartOpen(false)}
-                className="p-1.5 rounded-full text-slate-400 hover:text-white hover:bg-slate-800"
+                aria-label="Fermer le panier"
+                className="p-2 rounded-full text-slate-400 hover:text-white hover:bg-slate-800"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -906,25 +914,26 @@ export const ClientView: React.FC<ClientViewProps> = ({
                       )}
                     </div>
 
-                    <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800">
-                      <button
-                        onClick={() => updateCartQty(item.product.id, -1)}
-                        className="p-1 text-slate-400 hover:text-white"
-                      >
-                        <Minus className="w-3.5 h-3.5" />
-                      </button>
-                      <span className="text-xs font-black w-4 text-center text-slate-100">{item.quantity}</span>
-                      <button
-                        onClick={() => updateCartQty(item.product.id, 1)}
-                        className="p-1 text-slate-400 hover:text-white"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+                     <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800 min-w-[92px]">
+                       <button
+                         onClick={() => updateCartQty(item.product.id, -1)}
+                         className="p-2 rounded-lg text-slate-400 hover:text-white min-w-[32px] min-h-[32px] flex items-center justify-center"
+                       >
+                         <Minus className="w-4 h-4" />
+                       </button>
+                       <span className="text-xs font-black w-4 text-center text-slate-100">{item.quantity}</span>
+                       <button
+                         onClick={() => updateCartQty(item.product.id, 1)}
+                         className="p-2 rounded-lg text-slate-400 hover:text-white min-w-[32px] min-h-[32px] flex items-center justify-center"
+                       >
+                         <Plus className="w-4 h-4" />
+                       </button>
+                     </div>
 
                     <button
                       onClick={() => removeFromCart(item.product.id)}
-                      className="p-1.5 text-slate-500 hover:text-rose-400"
+                      aria-label={`Supprimer ${item.product.name} du panier`}
+                      className="p-2 text-slate-500 hover:text-rose-400 rounded-lg"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -990,7 +999,8 @@ export const ClientView: React.FC<ClientViewProps> = ({
               </div>
               <button
                 onClick={() => setIsOrdersOpen(false)}
-                className="p-1.5 rounded-full text-slate-400 hover:text-white"
+                aria-label="Fermer l'historique"
+                className="p-2 rounded-full text-slate-400 hover:text-white"
               >
                 <X className="w-5 h-5" />
               </button>

@@ -1,1 +1,78 @@
 @import "tailwindcss";
+
+/* Phone-friendly CSS */
+
+/* Use dynamic viewport units where supported for proper mobile height */
+@supports (height: 100dvh) {
+  html, body, #root {
+    height: 100dvh;
+  }
+}
+
+/* Remove default tap highlight on iOS */
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Prevent iOS input zoom: ensure inputs use at least 16px font on touch devices */
+@media (hover: none) {
+  input, textarea, select {
+    font-size: 16px;
+  }
+}
+
+/* Smooth momentum scrolling on mobile */
+html {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Hide scrollbar on WebKit for horizontal scroll containers */
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* Remove default tap highlight on interactive elements */
+button, a, input, select, textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Ensure proper touch target sizes on small screens for key interactive elements */
+@media (max-width: 639px) {
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Safe area insets for physical home indicator / Dynamic Island */
+html {
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* Utility classes for safe area insets (for fixed-position elements) */
+.safe-top { padding-top: env(safe-area-inset-top); }
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+.safe-left { padding-left: env(safe-area-inset-left); }
+.safe-right { padding-right: env(safe-area-inset-right); }
+.safe-inset-x { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+.safe-inset-y { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+
+/* Keyboard focus rings for accessibility */
+*:focus-visible {
+  @apply outline-2 outline-offset-2 outline-amber-400;
+}
+
+/* Focus ring for amber-themed elements */
+.focus-amber:focus-visible {
+  @apply outline-2 outline-offset-2 outline-amber-400;
+}
+
+/* Smooth transitions for interactive elements */
+button, a {
+  transition-duration: 150ms;
+}
