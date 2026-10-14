@@ -1,0 +1,22 @@
+# Render Static Site deployment for BarLounge SaaS (root Vite + React app).
+# Builds the Vite app and serves the generated dist/ as a static SPA.
+services:
+  - type: static
+    name: bar-lounge-saas
+    buildCommand: npm install && npm run build
+    publishDir: dist
+    autoDeploy: true
+    branch: master
+    # Serve index.html for every path so the single-page app never 404s.
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      # Public (anon) Supabase credentials — safe to expose in a client bundle.
+      # The app runs on localStorage when these are empty; set them here or in
+      # the Render dashboard to enable Supabase-backed data.
+      - key: VITE_SUPABASE_URL
+        value: https://dlgyrqxlfcjwddruxcqu.supabase.co
+      - key: VITE_SUPABASE_ANON_KEY
+        value: sb_publishable_RuRk_aQK_GzESI008a_o_A_QD7EDHdQ

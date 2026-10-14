@@ -7,6 +7,17 @@ import { defineConfig } from 'vite';
 
 const projectRoot = path.dirname(fileURLToPath(import.meta.url));
 
+// Render injects RENDER_EXTERNAL_HOSTNAME for the live service. Allow it (plus
+// any custom domain(s) via PREVIEW_EXTRA_HOSTS) so `vite preview` accepts the
+// request host during a Render deployment.
+const previewAllowedHosts = ['bar-os-main.onrender.com', 'localhost', '127.0.0.1'];
+if (process.env.RENDER_EXTERNAL_HOSTNAME) {
+  previewAllowedHosts.push(process.env.RENDER_EXTERNAL_HOSTNAME);
+}
+if (process.env.PREVIEW_EXTRA_HOSTS) {
+  previewAllowedHosts.push(...process.env.PREVIEW_EXTRA_HOSTS.split(',').map((h) => h.trim()).filter(Boolean));
+}
+
 export default defineConfig(() => {
   return {
     plugins: [react(), tailwindcss()],
@@ -23,7 +34,8 @@ export default defineConfig(() => {
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
     },
     preview: {
-      allowedHosts: ['bar-os-main.onrender.com'],
+      host: true,
+      allowedHosts: previewAllowedHosts,
     },
   };
 });

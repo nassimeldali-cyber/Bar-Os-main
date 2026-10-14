@@ -74,3 +74,20 @@ L'application racine n'est pas encore raccordée à ces migrations. Le déploiem
 
 ## 🧪 Tests Automatisés
 Les 15 tests critiques (Section 31 du cahier des charges) sont exécutables directement depuis l'interface Manager > onglet **"Tests & Diagnostics"**.
+
+---
+
+## 🚀 Déploiement sur Render (site statique)
+
+L'application racine (Vite + React) est déployable telle quelle sur Render en **Static Site**. La configuration est fournie par `render.yaml` (build + publish + route SPA) et `.node-version` (Node 22).
+
+### Étapes
+1. **Commit & push** des fichiers ajoutés (`render.yaml`, `.node-version`) et des corrections de `package.json`/`vite.config.ts`.
+2. Sur [dashboard.render.com](https://dashboard.render.com) → **New +** → **Static Site** → connecter ce dépôt.
+3. Render détecte `render.yaml` automatiquement :
+   - **Build Command** : `npm install && npm run build`
+   - **Publish Directory** : `dist`
+4. (Optionnel) Définir les variables d'environnement `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY` (déjà renseignées dans `render.yaml`). Si elles sont vides, l'application fonctionne en mode `localStorage`.
+5. **Create Static Site** → l'URL publique est de la forme `https://bar-lounge-saas.onrender.com`.
+
+> Note : `restaurant-saas/` (NestJS + Next.js) n'est **pas** déployé par cette configuration — c'est un squelette séparé et incomplet. Seule l'application racine est servie.
