@@ -22,9 +22,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const AUTH_STORAGE_KEY = 'barlounge_auth_user_id';
-const RESTAURANT_STORAGE_KEY = 'barlounge_auth_restaurant_id';
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<Profile | null>(null);
   const [currentRestaurant, setCurrentRestaurant] = useState<Restaurant | null>(null);
@@ -47,7 +44,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
             if (profile && !error) {
               setCurrentUser(profile as Profile);
-              localStorage.setItem(AUTH_STORAGE_KEY, profile.id);
 
               // Get restaurant from restaurant_users
               const { data: restUsers } = await client
@@ -58,7 +54,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
               const restId = restUsers?.[0]?.restaurant_id;
               if (restId) {
-                localStorage.setItem(RESTAURANT_STORAGE_KEY, restId);
+                dbEngine.setRestaurant(restId);
                 const restaurant = dbEngine.getAllRestaurants().find((r) => r.id === restId);
                 if (restaurant) {
                   setCurrentRestaurant(restaurant);
@@ -69,7 +65,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } else if (event === 'SIGNED_OUT') {
           setCurrentUser(null);
           setCurrentRestaurant(null);
-          localStorage.removeItem(AUTH_STORAGE_KEY);
         }
       });
 
@@ -86,7 +81,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               .then(({ data: profile, error }) => {
                 if (profile && !error) {
                   setCurrentUser(profile as Profile);
-                  localStorage.setItem(AUTH_STORAGE_KEY, profile.id);
                 }
                 const restaurant = dbEngine.getAllRestaurants()[0];
                 if (restaurant) {
@@ -102,19 +96,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         subscription.unsubscribe();
       };
     } else {
-      // Fallback: use localStorage cache without real auth
       const defaultRest = dbEngine.getAllRestaurants()[0];
       setCurrentRestaurant(defaultRest || null);
-
-      const savedUserId = localStorage.getItem(AUTH_STORAGE_KEY);
-      if (savedUserId) {
-        const profile = dbEngine.getProfileById(savedUserId);
-        if (profile && profile.is_active) {
-          setCurrentUser(profile);
-        } else {
-          localStorage.removeItem(AUTH_STORAGE_KEY);
-        }
-      }
       setIsLoading(false);
     }
   }, []);
@@ -122,14 +105,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string): Promise<boolean> => {
     if (!isSupabaseConfigured || !supabase) {
       // Fallback: look up profile in local cache
-      const profile = dbEngine.getProfileByEmail(email) || dbEngine.getProfileByUsername(email);
+       const profile = dbEngine.getProfileByEmail(email) || dbEngine.getProfileByUsername(email);
       if (profile && profile.is_active) {
         setCurrentUser(profile);
-        localStorage.setItem(AUTH_STORAGE_KEY, profile.id);
         const rest = dbEngine.getAllRestaurants()[0];
         if (rest) {
           setCurrentRestaurant(rest);
-          localStorage.setItem(RESTAURANT_STORAGE_KEY, rest.id);
+          dbEngine.setRestaurant(rest.id);
         }
         void dbEngine.syncToSupabase();
         return true;
@@ -161,7 +143,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       setCurrentUser(profile as Profile);
-      localStorage.setItem(AUTH_STORAGE_KEY, profile.id);
 
       const { data: restUsers } = await supabase!
         .from('restaurant_users')
@@ -171,7 +152,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const restId = restUsers?.[0]?.restaurant_id;
       if (restId) {
-        localStorage.setItem(RESTAURANT_STORAGE_KEY, restId);
+        dbEngine.setRestaurant(restId);
         const rest = dbEngine.getAllRestaurants().find((r) => r.id === restId);
         if (rest) {
           setCurrentRestaurant(rest);
@@ -183,7 +164,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             .single();
           if (restaurant) {
             setCurrentRestaurant(restaurant as Restaurant);
-            dbEngine.setRestaurant(restId);
           }
         }
       }
@@ -229,7 +209,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .single();
         if (profile) {
           setCurrentUser(profile as Profile);
-          localStorage.setItem(AUTH_STORAGE_KEY, profile.id);
         }
       }, 1000);
 
@@ -248,19 +227,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     setCurrentUser(null);
     setCurrentRestaurant(null);
-    localStorage.removeItem(AUTH_STORAGE_KEY);
   };
 
   const switchUser = (profileId: string) => {
     const prof = dbEngine.getProfileById(profileId);
     if (prof) {
       setCurrentUser(prof);
-      localStorage.setItem(AUTH_STORAGE_KEY, prof.id);
 
       const restUsers = dbEngine.getState().restaurantUsers.filter((ru) => ru.user_id === prof.id);
       const restId = restUsers[0]?.restaurant_id;
       if (restId) {
-        localStorage.setItem(RESTAURANT_STORAGE_KEY, restId);
+        dbEngine.setRestaurant(restId);
         const rest = dbEngine.getAllRestaurants().find((r) => r.id === restId);
         if (rest) {
           setCurrentRestaurant(rest);

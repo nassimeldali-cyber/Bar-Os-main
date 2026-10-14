@@ -87,24 +87,28 @@ export const SEED_STATE: DbState = {
       restaurant_id: RESTAURANT_ID,
       user_id: 'p0000000-0000-0000-0000-000000000101',
       role: 'MANAGER',
+      created_at: NOW,
     },
     {
       id: 'ru0000000-0000-0000-0000-000000000102',
       restaurant_id: RESTAURANT_ID,
       user_id: 'p0000000-0000-0000-0000-000000000102',
       role: 'SERVER',
+      created_at: NOW,
     },
     {
       id: 'ru0000000-0000-0000-0000-000000000103',
       restaurant_id: RESTAURANT_ID,
       user_id: 'p0000000-0000-0000-0000-000000000103',
       role: 'SERVER',
+      created_at: NOW,
     },
     {
       id: 'ru0000000-0000-0000-0000-000000000104',
       restaurant_id: RESTAURANT_ID,
       user_id: 'p0000000-0000-0000-0000-000000000104',
       role: 'SERVER',
+      created_at: NOW,
     },
   ],
 

@@ -7,6 +7,7 @@
 import {
   Restaurant,
   Profile,
+  RestaurantUser,
   TableItem,
   TableSession,
   Category,
@@ -25,8 +26,6 @@ import {
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { SEED_STATE } from './seedData';
 
-const STORAGE_KEY = 'barlounge_saas_db_v4_zoobar_full';
-const RESTAURANT_STORAGE_KEY = 'barlounge_auth_restaurant_id';
 const SYNC_CHANNEL_NAME = 'barlounge_sync_channel';
 
 // Realtime event emitter
@@ -102,7 +101,7 @@ export function broadcastEvent(type: RealtimeEventType, data: any) {
 export interface DbState {
   restaurants: Restaurant[];
   profiles: Profile[];
-  restaurantUsers: { id: string; restaurant_id: string; user_id: string; role: 'MANAGER' | 'SERVER' }[];
+  restaurantUsers: RestaurantUser[];
   tables: TableItem[];
   tableSessions: TableSession[];
   serverAssignments: ServerTableAssignment[];
@@ -124,6 +123,7 @@ export const EMPTY_STATE: DbState = SEED_STATE;
 
 class DatabaseEngine {
   private state: DbState;
+  private currentRestaurantId: string | null = null;
   private realtimeChannels: any[] = [];
 
   constructor() {
@@ -133,70 +133,49 @@ class DatabaseEngine {
   }
 
   private loadState(): DbState {
-    if (typeof window === 'undefined') {
-      return JSON.parse(JSON.stringify(EMPTY_STATE));
-    }
-    // localStorage is a fallback cache; primary source is Supabase (loaded async in constructor)
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed.restaurants && parsed.restaurants.length > 0) {
-          return parsed;
-        }
-      }
-    } catch (e) {
-      console.warn('Could not load stored database state, using initial seed', e);
-    }
-    const fresh = JSON.parse(JSON.stringify(EMPTY_STATE));
-    return fresh;
+    return JSON.parse(JSON.stringify(EMPTY_STATE));
   }
 
   private saveState(state: DbState) {
-    // Always persist to localStorage as cache/fallback
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      } catch (e) {
-        console.error('Failed to write database to localStorage', e);
-      }
-    }
-    // Primary persistence is Supabase
-    this.syncToSupabase();
+    this.syncToSupabase(state);
   }
 
-  public async syncToSupabase(): Promise<void> {
+  public async syncToSupabase(state: DbState = this.state): Promise<void> {
     if (!isSupabaseConfigured || !supabase) return;
-    const s = this.state;
-    try {
-      await supabase.from('restaurants').upsert(s.restaurants, { onConflict: 'id' });
-      await supabase.from('restaurant_users').upsert(s.restaurantUsers, { onConflict: 'id' });
-      await supabase.from('tables').upsert(s.tables, { onConflict: 'id' });
-      await supabase.from('table_sessions').upsert(s.tableSessions, { onConflict: 'id' });
-      await supabase.from('server_table_assignments').upsert(s.serverAssignments, { onConflict: 'id' });
-      await supabase.from('categories').upsert(s.categories, { onConflict: 'id' });
-      await supabase.from('products').upsert(s.products, { onConflict: 'id' });
-      await supabase.from('orders').upsert(s.orders, { onConflict: 'id' });
-      await supabase.from('order_items').upsert(s.orderItems, { onConflict: 'id' });
-      await supabase.from('payments').upsert(s.payments, { onConflict: 'id' });
-      await supabase.from('service_requests').upsert(s.serviceRequests, { onConflict: 'id' });
-      await supabase.from('notifications').upsert(s.notifications, { onConflict: 'id' });
-      await supabase.from('audit_logs').upsert(s.auditLogs, { onConflict: 'id' });
-    } catch (e) {
-      console.warn('Supabase sync failed, localStorage will remain source of truth', e);
-    }
+
+    const syncTable = async (table: string, data: any[]): Promise<void> => {
+      if (data.length === 0) return;
+      try {
+        await supabase!.from(table).upsert(data, { onConflict: 'id' });
+      } catch (e) {
+        console.warn(`[Supabase] Sync failed for table "${table}", in-memory state remains source of truth`, e);
+      }
+    };
+
+    await Promise.all([
+      syncTable('restaurants', state.restaurants),
+      syncTable('restaurant_users', state.restaurantUsers),
+      syncTable('tables', state.tables),
+      syncTable('table_sessions', state.tableSessions),
+      syncTable('server_table_assignments', state.serverAssignments),
+      syncTable('categories', state.categories),
+      syncTable('products', state.products),
+      syncTable('orders', state.orders),
+      syncTable('order_items', state.orderItems),
+      syncTable('payments', state.payments),
+      syncTable('service_requests', state.serviceRequests),
+      syncTable('notifications', state.notifications),
+      syncTable('audit_logs', state.auditLogs),
+    ]);
   }
 
   private async tryHydrateFromSupabase(): Promise<void> {
     if (!isSupabaseConfigured || !supabase || typeof window === 'undefined') return;
 
-    // Get restaurant ID from localStorage (set during auth) or from restaurant_users
-    let restId = this.state.restaurants[0]?.id;
+    // Get restaurant ID from in-memory cache or seed state
+    let restId = this.currentRestaurantId;
     if (!restId) {
-      const storedRestId = localStorage.getItem(RESTAURANT_STORAGE_KEY);
-      if (storedRestId) {
-        restId = storedRestId;
-      }
+      restId = this.state.restaurants[0]?.id;
     }
 
     try {
@@ -279,22 +258,12 @@ class DatabaseEngine {
         counters: this.state.counters,
       };
 
-      // Update localStorage cache
-      if (typeof window !== 'undefined') {
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
-          if (restId) {
-            localStorage.setItem(RESTAURANT_STORAGE_KEY, restId);
-          }
-        } catch {}
-      }
-
-      console.log('[Supabase] State hydrated from database — Supabase is primary source');
+       console.log('[Supabase] State hydrated from database — Supabase is primary source');
       broadcastEvent('SESSION_UPDATED', { source: 'supabase_hydration' });
       broadcastEvent('TABLE_STATUS_CHANGED', {});
       broadcastEvent('MENU_UPDATED', {});
     } catch (e) {
-      console.warn('[Supabase] Hydration failed, using localStorage state', e);
+      console.warn('[Supabase] Hydration failed, using in-memory seed state', e);
     }
   }
 
@@ -324,9 +293,9 @@ class DatabaseEngine {
 
   private async refreshStateFromSupabase(): Promise<void> {
     if (!isSupabaseConfigured || !supabase) return;
-    let restId = this.state.restaurants[0]?.id;
+    let restId = this.currentRestaurantId;
     if (!restId) {
-      restId = localStorage.getItem(RESTAURANT_STORAGE_KEY) || '';
+      restId = this.state.restaurants[0]?.id;
     }
     if (!restId) return;
     try {
@@ -379,9 +348,7 @@ class DatabaseEngine {
       if (serverAssignsResult.length) this.state.serverAssignments = serverAssignsResult;
 
       if (typeof window !== 'undefined') {
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
-        } catch {}
+        this.syncToSupabase();
       }
     } catch (e) {
       console.warn('[Supabase] Realtime refresh failed', e);
@@ -395,10 +362,8 @@ class DatabaseEngine {
 
   public resetToSeed(): DbState {
     this.state = JSON.parse(JSON.stringify(EMPTY_STATE));
+    this.currentRestaurantId = null;
     this.saveState(this.state);
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem(RESTAURANT_STORAGE_KEY);
-    }
     broadcastEvent('MENU_UPDATED', {});
     broadcastEvent('TABLE_STATUS_CHANGED', {});
     setTimeout(() => this.tryHydrateFromSupabase(), 500);
@@ -406,16 +371,6 @@ class DatabaseEngine {
   }
 
   public getState(): DbState {
-    // When Supabase is the primary source, in-memory state is kept fresh by Realtime.
-    // Only fall back to localStorage when Supabase is not configured (offline/dev mode).
-    if (!isSupabaseConfigured && typeof window !== 'undefined') {
-      try {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-          this.state = JSON.parse(stored);
-        }
-      } catch (e) {}
-    }
     return this.state;
   }
 
@@ -458,28 +413,28 @@ class DatabaseEngine {
   }
 
   public getRestaurantId(): string | null {
+    if (this.currentRestaurantId) return this.currentRestaurantId;
     const state = this.getState();
     if (state.restaurants[0]?.id) return state.restaurants[0].id;
     if (state.restaurantUsers[0]?.restaurant_id) return state.restaurantUsers[0].restaurant_id;
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem(RESTAURANT_STORAGE_KEY);
-      if (stored) return stored;
-    }
     return null;
   }
 
   public setRestaurant(restaurantId: string): void {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(RESTAURANT_STORAGE_KEY, restaurantId);
-    }
+    this.currentRestaurantId = restaurantId;
+    void this.tryHydrateFromSupabase();
   }
 
   public getProfileByUsername(username: string): Profile | undefined {
-    return this.getState().profiles.find((p) => p.username.toUpperCase() === username.trim().toUpperCase() && p.is_active);
+    return this.getState().profiles.find(
+      (p) => (p.username || '').toUpperCase() === username.trim().toUpperCase() && p.is_active
+    );
   }
 
   public getProfileByEmail(email: string): Profile | undefined {
-    return this.getState().profiles.find((p) => p.email.toLowerCase() === email.trim().toLowerCase() && p.is_active);
+    return this.getState().profiles.find(
+      (p) => (p.email || '').toLowerCase() === email.trim().toLowerCase() && p.is_active
+    );
   }
 
   public getProfileById(id: string): Profile | undefined {
@@ -496,7 +451,9 @@ class DatabaseEngine {
   public createServerProfile(restaurantId: string, username: string, fullName: string, email: string): Profile {
     this.getState();
     const existing = this.state.profiles.find(
-      (p) => p.username.toUpperCase() === username.trim().toUpperCase() || p.email.toLowerCase() === email.trim().toLowerCase()
+      (p) =>
+        (p.username || '').toUpperCase() === username.trim().toUpperCase() ||
+        (p.email || '').toLowerCase() === email.trim().toLowerCase()
     );
     if (existing) {
       throw new Error(`Un serveur avec cet identifiant ou cet email existe déjà (${username})`);
@@ -518,7 +475,8 @@ class DatabaseEngine {
       id: 'ru-' + Math.random().toString(36).substring(2, 9),
       restaurant_id: restaurantId,
       user_id: newProfile.id,
-      role: 'SERVER'
+      role: 'SERVER',
+      created_at: new Date().toISOString()
     });
 
     this.logAudit(restaurantId, 'CREATE_SERVER', 'PROFILE', newProfile.id, { username, fullName });
@@ -530,9 +488,25 @@ class DatabaseEngine {
     this.getState();
     const p = this.state.profiles.find((prof) => prof.id === serverId);
     if (!p) throw new Error('Serveur introuvable');
+    const isMember = this.state.restaurantUsers.some(
+      (ru) => ru.user_id === serverId && ru.restaurant_id === restaurantId
+    );
+    if (!isMember) throw new Error('Ce profil n\'appartient pas à cet établissement');
     p.is_active = !p.is_active;
     p.updated_at = new Date().toISOString();
     this.logAudit(restaurantId, 'TOGGLE_SERVER_STATUS', 'PROFILE', serverId, { active: p.is_active });
+    this.persist();
+    return p;
+  }
+
+  public updateProfile(profileId: string, updates: Partial<Profile>): Profile {
+    this.getState();
+    const p = this.state.profiles.find((prof) => prof.id === profileId);
+    if (!p) throw new Error('Profil introuvable');
+    const { id, ...rest } = updates as Partial<Profile>;
+    Object.assign(p, rest, { updated_at: new Date().toISOString() });
+    const restUser = this.state.restaurantUsers.find((ru) => ru.user_id === profileId);
+    this.logAudit(restUser?.restaurant_id || '', 'UPDATE_PROFILE', 'PROFILE', profileId, updates);
     this.persist();
     return p;
   }
@@ -593,11 +567,29 @@ class DatabaseEngine {
     this.getState();
     const t = this.state.tables.find((tbl) => tbl.id === tableId);
     if (!t) throw new Error('Table introuvable');
-    Object.assign(t, updates, { updated_at: new Date().toISOString() });
+    const safe: Partial<TableItem> = { ...updates };
+    delete safe.id;
+    delete safe.restaurant_id;
+    Object.assign(t, safe, { updated_at: new Date().toISOString() });
     this.logAudit(t.restaurant_id, 'UPDATE_TABLE', 'TABLE', tableId, updates);
     this.persist();
     broadcastEvent('TABLE_STATUS_CHANGED', t);
     return t;
+  }
+
+  public deleteTable(tableId: string): void {
+    this.getState();
+    const idx = this.state.tables.findIndex((t) => t.id === tableId);
+    if (idx === -1) throw new Error('Table introuvable');
+    const t = this.state.tables[idx];
+    const hasActiveSession = this.state.tableSessions.some(
+      (s) => s.table_id === tableId && ['OPEN', 'ADDITION_REQUESTED', 'PAYMENT_PENDING'].includes(s.status)
+    );
+    if (hasActiveSession) throw new Error('Impossible de supprimer une table avec une session active');
+    this.state.tables.splice(idx, 1);
+    this.logAudit(t.restaurant_id, 'DELETE_TABLE', 'TABLE', tableId, {});
+    this.persist();
+    broadcastEvent('TABLE_STATUS_CHANGED', t);
   }
 
   public getServerAssignedTableIds(serverId: string): string[] {
@@ -721,6 +713,23 @@ class DatabaseEngine {
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }
 
+  public getOrderById(orderId: string): Order | undefined {
+    const state = this.getState();
+    const order = state.orders.find((o) => o.id === orderId);
+    if (!order) return undefined;
+    const items = state.orderItems.filter((it) => it.order_id === order.id);
+    const table = state.tables.find((t) => t.id === order.table_id);
+    return {
+      ...order,
+      items,
+      table_number: table ? table.table_number : order.table_number
+    };
+  }
+
+  public cancelOrder(orderId: string, actorId?: string, actorName?: string): Order {
+    return this.updateOrderStatus(orderId, 'CANCELLED', actorId, actorName);
+  }
+
   public createOrder(
     restaurantId: string,
     sessionId: string,
@@ -733,9 +742,15 @@ class DatabaseEngine {
     if (!session || !['OPEN', 'ADDITION_REQUESTED'].includes(session.status)) {
       throw new Error('Impossible de commander sur une session fermée ou inexistante.');
     }
+    if (session.restaurant_id !== restaurantId) {
+      throw new Error('Cette session n\'appartient pas à cet établissement');
+    }
 
     const table = this.state.tables.find((t) => t.id === tableId);
     if (!table) throw new Error('Table invalide');
+    if (table.restaurant_id !== restaurantId) {
+      throw new Error('Cette table n\'appartient pas à cet établissement');
+    }
 
     if (itemsToOrder.length === 0) {
       throw new Error('Le panier est vide.');
@@ -888,6 +903,22 @@ class DatabaseEngine {
   // --------------------------------------------------------------------------
   // SERVICE REQUESTS & BILL
   // --------------------------------------------------------------------------
+  public getServiceRequests(restaurantId: string): ServiceRequest[] {
+    return this.getState().serviceRequests
+      .filter((r) => r.restaurant_id === restaurantId)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }
+
+  public getServiceRequestsByTable(tableId: string): ServiceRequest[] {
+    return this.getState().serviceRequests
+      .filter((r) => r.table_id === tableId)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }
+
+  public getServiceRequestById(requestId: string): ServiceRequest | undefined {
+    return this.getState().serviceRequests.find((r) => r.id === requestId);
+  }
+
   public requestBill(sessionId: string): TableSession {
     this.getState();
     const session = this.state.tableSessions.find((s) => s.id === sessionId);
@@ -932,6 +963,10 @@ class DatabaseEngine {
   public createServiceRequest(tableId: string, restaurantId: string, type: ServiceRequestType, sessionId?: string): ServiceRequest {
     this.getState();
     const table = this.state.tables.find((t) => t.id === tableId);
+    if (!table) throw new Error('Table introuvable');
+    if (table.restaurant_id !== restaurantId) {
+      throw new Error('Cette table n\'appartient pas à cet établissement');
+    }
     const req: ServiceRequest = {
       id: 'sr-' + Math.random().toString(36).substring(2, 9),
       restaurant_id: restaurantId,
@@ -940,7 +975,7 @@ class DatabaseEngine {
       type,
       status: 'PENDING',
       created_at: new Date().toISOString(),
-      table_number: table?.table_number
+      table_number: table.table_number
     };
 
     this.state.serviceRequests.unshift(req);
@@ -949,6 +984,8 @@ class DatabaseEngine {
       CALL_SERVER: 'Client demande un serveur',
       BILL_REQUEST: "Demande d'addition",
       WATER_REQUEST: "Demande d'eau / verre",
+      ICE_REQUEST: 'Demande de glaçons supplémentaires',
+      ASHTRAY_REQUEST: 'Demande de cendrier',
       OTHER: 'Appel table'
     };
 
@@ -1080,6 +1117,10 @@ class DatabaseEngine {
       .sort((a, b) => a.display_order - b.display_order);
   }
 
+  public getCategoryById(categoryId: string): Category | undefined {
+    return this.getState().categories.find((c) => c.id === categoryId);
+  }
+
   public getProducts(restaurantId: string): Product[] {
     return this.getState().products
       .filter((p) => p.restaurant_id === restaurantId)
@@ -1110,6 +1151,33 @@ class DatabaseEngine {
     return newCat;
   }
 
+  public updateCategory(categoryId: string, updates: Partial<Category>): Category {
+    this.getState();
+    const c = this.state.categories.find((cat) => cat.id === categoryId);
+    if (!c) throw new Error('Catégorie introuvable');
+    const safe: Partial<Category> = { ...updates };
+    delete safe.id;
+    delete safe.restaurant_id;
+    Object.assign(c, safe);
+    this.logAudit(c.restaurant_id, 'UPDATE_CATEGORY', 'CATEGORY', categoryId, updates);
+    this.persist();
+    broadcastEvent('MENU_UPDATED', c);
+    return c;
+  }
+
+  public deleteCategory(categoryId: string): void {
+    this.getState();
+    const idx = this.state.categories.findIndex((c) => c.id === categoryId);
+    if (idx === -1) throw new Error('Catégorie introuvable');
+    const hasProducts = this.state.products.some((p) => p.category_id === categoryId);
+    if (hasProducts) throw new Error('Impossible de supprimer une catégorie contenant des produits');
+    const c = this.state.categories[idx];
+    this.state.categories.splice(idx, 1);
+    this.logAudit(c.restaurant_id, 'DELETE_CATEGORY', 'CATEGORY', categoryId, {});
+    this.persist();
+    broadcastEvent('MENU_UPDATED', c);
+  }
+
   public createProduct(restaurantId: string, productData: Omit<Product, 'id' | 'created_at' | 'updated_at' | 'restaurant_id'>): Product {
     this.getState();
     const newProduct: Product = {
@@ -1126,11 +1194,18 @@ class DatabaseEngine {
     return newProduct;
   }
 
+  public getProductById(productId: string): Product | undefined {
+    return this.getState().products.find((p) => p.id === productId);
+  }
+
   public updateProduct(productId: string, updates: Partial<Product>): Product {
     this.getState();
     const p = this.state.products.find((prod) => prod.id === productId);
     if (!p) throw new Error('Produit introuvable');
-    Object.assign(p, updates, { updated_at: new Date().toISOString() });
+    const safe: Partial<Product> = { ...updates };
+    delete safe.id;
+    delete safe.restaurant_id;
+    Object.assign(p, safe, { updated_at: new Date().toISOString() });
     this.logAudit(p.restaurant_id, 'UPDATE_PRODUCT', 'PRODUCT', productId, updates);
     this.persist();
     broadcastEvent('MENU_UPDATED', p);
@@ -1149,6 +1224,19 @@ class DatabaseEngine {
     return p;
   }
 
+  public deleteProduct(productId: string): void {
+    this.getState();
+    const idx = this.state.products.findIndex((p) => p.id === productId);
+    if (idx === -1) throw new Error('Produit introuvable');
+    const activeOrder = this.state.orderItems.some((it) => it.product_id === productId);
+    if (activeOrder) throw new Error('Impossible de supprimer un produit référencé par des commandes');
+    const p = this.state.products[idx];
+    this.state.products.splice(idx, 1);
+    this.logAudit(p.restaurant_id, 'DELETE_PRODUCT', 'PRODUCT', productId, { name: p.name });
+    this.persist();
+    broadcastEvent('MENU_UPDATED', p);
+  }
+
   // --------------------------------------------------------------------------
   // NOTIFICATIONS & AUDIT
   // --------------------------------------------------------------------------
@@ -1159,13 +1247,19 @@ class DatabaseEngine {
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }
 
-  public markNotificationAsRead(notifId: string) {
+  public getNotificationById(notifId: string): AppNotification | undefined {
+    return this.getState().notifications.find((n) => n.id === notifId);
+  }
+
+  public markNotificationAsRead(notifId: string): AppNotification | undefined {
     this.getState();
     const n = this.state.notifications.find((notif) => notif.id === notifId);
     if (n) {
       n.is_read = true;
       this.persist();
+      return n;
     }
+    return undefined;
   }
 
   public markAllNotificationsAsRead(restaurantId: string) {
@@ -1186,6 +1280,20 @@ class DatabaseEngine {
     return this.getState().payments
       .filter((p) => p.restaurant_id === restaurantId)
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }
+
+  public getPaymentById(paymentId: string): Payment | undefined {
+    return this.getState().payments.find((p) => p.id === paymentId);
+  }
+
+  public getPaymentBySession(sessionId: string): Payment | undefined {
+    return this.getState().payments.find((p) => p.session_id === sessionId);
+  }
+
+  public getPaymentByTable(tableId: string): Payment | undefined {
+    const sessions = this.getState().tableSessions.filter((s) => s.table_id === tableId);
+    const sessionIds = sessions.map((s) => s.id);
+    return this.getState().payments.find((p) => sessionIds.includes(p.session_id));
   }
 }
 

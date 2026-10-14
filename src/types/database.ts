@@ -12,7 +12,7 @@ export type OrderStatus = 'NEW' | 'ACCEPTED' | 'TRANSMITTED_TO_POS' | 'PREPARING
 
 export type PaymentMethod = 'CASH' | 'TPE';
 
-export type ServiceRequestType = 'CALL_SERVER' | 'BILL_REQUEST' | 'WATER_REQUEST' | 'OTHER';
+export type ServiceRequestType = 'CALL_SERVER' | 'BILL_REQUEST' | 'WATER_REQUEST' | 'OTHER' | 'ICE_REQUEST' | 'ASHTRAY_REQUEST';
 
 export type ServiceRequestStatus = 'PENDING' | 'ACKNOWLEDGED' | 'RESOLVED';
 

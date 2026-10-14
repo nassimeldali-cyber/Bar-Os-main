@@ -96,8 +96,7 @@ export const ServerView: React.FC<ServerViewProps> = ({ onOpenTableClient }) => 
 
   // Service requests
   const serviceRequests = useMemo(() => {
-    return dbEngine.getState().serviceRequests
-      .filter((r) => r.restaurant_id === restaurantId && r.status === 'PENDING');
+    return dbEngine.getServiceRequests(restaurantId).filter((r) => r.status === 'PENDING');
   }, [restaurantId, lastEventTimestamp]);
 
   // Actions: Transmit to POS

@@ -51,7 +51,7 @@ export async function runAllTests(): Promise<{
   // Reset in-memory state and re-hydrate from Supabase
   dbEngine.resetToSeed();
 
-  // Get actual restaurant ID from dbEngine (sourced from DB or localStorage)
+  // Get actual restaurant ID from dbEngine (sourced from DB or seed state)
   const restaurants = dbEngine.getAllRestaurants();
   const restId = restaurants[0]?.id || '';
 
